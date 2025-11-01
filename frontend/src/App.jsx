@@ -12,7 +12,7 @@ const DEFAULT_SETTINGS = {
 }
 
 function App() {
-  const [selectedModel, setSelectedModel] = useState('anthropic/claude-sonnet-4.5')
+  const [selectedModel, setSelectedModel] = useState('google/gemini-2.5-pro')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   const [theme, setTheme] = useState(() => {

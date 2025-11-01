@@ -64,6 +64,9 @@ function Message({ message }) {
         {message.model && !isUser && (
           <div className="message-model">
             {message.model}
+            {message.cost && (
+              <span className="message-cost"> • {message.cost.total_cost_rub.toFixed(2)} руб.</span>
+            )}
           </div>
         )}
       </div>

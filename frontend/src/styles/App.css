@@ -356,6 +356,12 @@ body {
   font-weight: 500;
 }
 
+.message-cost {
+  color: var(--text-tertiary);
+  opacity: 0.8;
+  font-weight: 500;
+}
+
 /* Copy Button */
 .copy-button {
   position: absolute;

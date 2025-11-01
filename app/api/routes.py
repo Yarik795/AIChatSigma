@@ -2,8 +2,14 @@
 API endpoints для работы с OpenRouter
 """
 import os
+import logging
 import requests
 from flask import Blueprint, request, jsonify
+from app.api.cost_calculator import calculate_cost_rub
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 api_bp = Blueprint('api', __name__)
 
@@ -149,10 +155,43 @@ def chat():
                 content = response_data['choices'][0]['message']['content']
                 used_model = response_data.get('model', model)
                 
-                return jsonify({
-                    'content': content,
-                    'model': used_model
-                }), 200
+                # Рассчитываем стоимость запроса
+                cost_info = calculate_cost_rub(response_data, used_model)
+                
+                # Выводим стоимость в консоль
+                if cost_info:
+                    total_cost_rub = cost_info['total_cost_rub']
+                    prompt_tokens = cost_info['prompt_tokens']
+                    completion_tokens = cost_info['completion_tokens']
+                    total_tokens = cost_info['total_tokens']
+                    
+                    logger.info("=" * 60)
+                    logger.info(f"СТОИМОСТЬ ЗАПРОСА:")
+                    logger.info(f"Модель: {used_model}")
+                    logger.info(f"Токенов (prompt/completion/total): {prompt_tokens}/{completion_tokens}/{total_tokens}")
+                    logger.info(f"Общая стоимость: {total_cost_rub:.2f} руб.")
+                    logger.info("=" * 60)
+                    
+                    # Формируем ответ с информацией о стоимости
+                    response_json = {
+                        'content': content,
+                        'model': used_model,
+                        'cost': {
+                            'total_cost_rub': total_cost_rub,
+                            'prompt_tokens': prompt_tokens,
+                            'completion_tokens': completion_tokens,
+                            'total_tokens': total_tokens
+                        }
+                    }
+                else:
+                    # Если не удалось рассчитать стоимость, возвращаем ответ без неё
+                    logger.warning("Не удалось рассчитать стоимость запроса")
+                    response_json = {
+                        'content': content,
+                        'model': used_model
+                    }
+                
+                return jsonify(response_json), 200
             else:
                 return jsonify({'error': 'Неожиданный формат ответа от OpenRouter'}), 500
         

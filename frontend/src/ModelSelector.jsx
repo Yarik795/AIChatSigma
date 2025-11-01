@@ -2,18 +2,18 @@ import { useState } from 'react'
 
 const MODELS = [
   { 
+    value: 'google/gemini-2.5-pro', 
+    label: 'Gemini 2.5 Pro', 
+    icon: '💎',
+    logo: '/images/models/gemini.svg'
+  },
+  { 
     value: 'anthropic/claude-sonnet-4.5', 
     label: 'Claude Sonnet 4.5', 
     icon: '🤖',
     // Используйте локальный файл или внешний URL
     // Пример внешнего URL: 'https://cdn.jsdelivr.net/gh/simple-icons/simple-icons@v9/icons/anthropic.svg'
     logo: '/images/models/claude.svg'
-  },
-  { 
-    value: 'google/gemini-2.5-pro', 
-    label: 'Gemini 2.5 Pro', 
-    icon: '💎',
-    logo: '/images/models/gemini.svg'
   },
   { 
     value: 'x-ai/grok-4-fast', 

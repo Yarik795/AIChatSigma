@@ -64,7 +64,8 @@ function Chat({ selectedModel, settings }) {
       const assistantMessage = {
         role: 'assistant',
         content: response.data.content,
-        model: response.data.model
+        model: response.data.model,
+        cost: response.data.cost // Добавляем информацию о стоимости
       }
       
       setMessages(prev => [...prev, assistantMessage])
