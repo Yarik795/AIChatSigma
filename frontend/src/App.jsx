@@ -15,6 +15,11 @@ function App() {
   const [selectedModel, setSelectedModel] = useState('anthropic/claude-sonnet-4.5')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+  const [theme, setTheme] = useState(() => {
+    // Загружаем сохраненную тему из localStorage или используем 'dark' по умолчанию
+    const savedTheme = localStorage.getItem('theme')
+    return savedTheme || 'dark'
+  })
 
   useEffect(() => {
     // Загружаем сохраненные настройки при загрузке приложения
@@ -29,11 +34,38 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    // Применяем тему к body элементу
+    document.body.setAttribute('data-theme', theme)
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
+  const toggleTheme = () => {
+    setTheme(prevTheme => prevTheme === 'dark' ? 'light' : 'dark')
+  }
+
   return (
     <div className="app">
       <div className="header">
         <h1>OpenRouter Chat</h1>
         <div className="header-controls">
+          <button 
+            className="theme-toggle-button"
+            onClick={toggleTheme}
+            aria-label={theme === 'dark' ? 'Переключить на светлую тему' : 'Переключить на темную тему'}
+            title={theme === 'dark' ? 'Светлая тема' : 'Темная тема'}
+          >
+            {theme === 'dark' ? (
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 3.33333V1.66667M10 18.3333V16.6667M16.6667 10H18.3333M1.66667 10H3.33333M15.7733 4.22667L16.8867 3.11333M3.11333 16.8867L4.22667 15.7733M15.7733 15.7733L16.8867 16.8867M3.11333 3.11333L4.22667 4.22667M14.1667 10C14.1667 12.3012 12.3012 14.1667 10 14.1667C7.69882 14.1667 5.83333 12.3012 5.83333 10C5.83333 7.69882 7.69882 5.83333 10 5.83333C12.3012 5.83333 14.1667 7.69882 14.1667 10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 16.25C13.4518 16.25 16.25 13.4518 16.25 10C16.25 6.54822 13.4518 3.75 10 3.75C6.54822 3.75 3.75 6.54822 3.75 10C3.75 13.4518 6.54822 16.25 10 16.25Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M10 3.33333V1.66667M10 18.3333V16.6667M16.6667 10H18.3333M1.66667 10H3.33333M15.7733 4.22667L16.8867 3.11333M3.11333 16.8867L4.22667 15.7733M15.7733 15.7733L16.8867 16.8867M3.11333 3.11333L4.22667 4.22667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+          </button>
           <button 
             className="settings-button"
             onClick={() => setIsSettingsOpen(true)}
