@@ -8,6 +8,7 @@ import time
 import requests
 from flask import Blueprint, request, jsonify, Response, stream_with_context
 from app.api.cost_calculator import calculate_cost_rub
+from app.config.prompt_loader import get_system_prompt
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -118,14 +119,16 @@ def chat():
         if http_referer:
             headers['HTTP-Referer'] = http_referer
         
+        # Формируем массив сообщений с системным промптом
+        messages = []
+        system_prompt = get_system_prompt()
+        if system_prompt:
+            messages.append({'role': 'system', 'content': system_prompt})
+        messages.append({'role': 'user', 'content': message})
+        
         payload = {
             'model': model,
-            'messages': [
-                {
-                    'role': 'user',
-                    'content': message
-                }
-            ]
+            'messages': messages
         }
         
         # Добавляем опциональные параметры в payload (только если переданы)
@@ -298,15 +301,17 @@ def _validate_chat_params(data):
         except (ValueError, TypeError):
             return None, None, None, (jsonify({'error': 'top_p должен быть числом'}), 400)
     
+    # Формируем массив сообщений с системным промптом
+    messages = []
+    system_prompt = get_system_prompt()
+    if system_prompt:
+        messages.append({'role': 'system', 'content': system_prompt})
+    messages.append({'role': 'user', 'content': message})
+    
     # Формируем payload
     payload = {
         'model': model,
-        'messages': [
-            {
-                'role': 'user',
-                'content': message
-            }
-        ],
+        'messages': messages,
         'stream': True  # Включаем streaming для OpenRouter
     }
     
