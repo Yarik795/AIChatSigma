@@ -4,6 +4,7 @@ API endpoints для работы с OpenRouter
 import os
 import logging
 import json
+import time
 import requests
 from flask import Blueprint, request, jsonify, Response, stream_with_context
 from app.api.cost_calculator import calculate_cost_rub
@@ -403,25 +404,41 @@ def chat_stream():
                 finish_reason = None
                 usage_data = None
                 
+                # Переменные для keep-alive механизма
+                last_event_time = time.time()
+                keep_alive_interval = 8  # секунд между keep-alive комментариями
+                
                 # Парсим потоковые данные от OpenRouter
                 try:
                     for line in response.iter_lines():
+                        # Проверяем нужно ли отправить keep-alive
+                        current_time = time.time()
+                        if current_time - last_event_time > keep_alive_interval:
+                            yield ":\n\n"  # Keep-alive комментарий
+                            last_event_time = current_time
+                        
+                        # Обрабатываем пустые строки
                         if not line:
                             continue
                         
-                        # Декодируем строку
+                        # Декодируем строку с обработкой ошибок
                         try:
-                            line_str = line.decode('utf-8')
+                            line_str = line.decode('utf-8', errors='ignore')
                         except UnicodeDecodeError as decode_error:
                             logger.warning(f"Ошибка декодирования строки: {decode_error}")
                             continue
                         
-                        # Пропускаем служебные строки SSE
+                        # Обрабатываем комментарии (keep-alive от OpenRouter или наши собственные)
+                        if line_str.startswith(':'):
+                            # Это комментарий, пропускаем
+                            continue
+                        
+                        # Обрабатываем data строки
                         if line_str.startswith('data: '):
-                            data_str = line_str[6:]  # Убираем "data: "
+                            data_str = line_str[6:].strip()  # Убираем "data: " и пробелы
                             
                             # Проверяем на завершение потока
-                            if data_str.strip() == '[DONE]':
+                            if data_str == '[DONE]':
                                 # Отправляем финальное сообщение с метаданными
                                 final_data = {
                                     'token': '',
@@ -450,9 +467,14 @@ def chat_stream():
                                         logger.info("=" * 60)
                                 
                                 yield f"data: {json.dumps(final_data, ensure_ascii=False)}\n\n"
+                                last_event_time = time.time()
                                 break
                             
                             # Парсим JSON данные
+                            if not data_str:
+                                # Пустая data строка, пропускаем
+                                continue
+                            
                             try:
                                 chunk_data = json.loads(data_str)
                                 
@@ -484,9 +506,11 @@ def chat_stream():
                                             'done': False
                                         }
                                         yield f"data: {json.dumps(event_data, ensure_ascii=False)}\n\n"
+                                        last_event_time = time.time()  # Обновляем время последнего события
                             
-                            except json.JSONDecodeError:
-                                # Пропускаем некорректные JSON строки
+                            except json.JSONDecodeError as json_error:
+                                # Пропускаем некорректные JSON строки (не прерываем генератор)
+                                logger.debug(f"Пропущен некорректный JSON: {data_str[:50]}... Ошибка: {json_error}")
                                 continue
                 except requests.exceptions.ChunkedEncodingError as e:
                     # Ошибка при чтении chunked потока (обрыв соединения)
@@ -532,6 +556,7 @@ def chat_stream():
             mimetype='text/event-stream',
             headers={
                 'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
                 'X-Accel-Buffering': 'no'  # Отключаем буферизацию для nginx
             }
         )
