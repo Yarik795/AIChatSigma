@@ -224,7 +224,7 @@ function Chat({ selectedModel, settings }) {
         {messages.map((message, index) => (
           <Message key={index} message={message} />
         ))}
-        {isLoading && !messages.some(msg => msg.role === 'assistant' && msg.isStreaming) && (
+        {isLoading && (
           <div className="message assistant loading">
             <div className="message-content">
               <div className="typing-indicator">
