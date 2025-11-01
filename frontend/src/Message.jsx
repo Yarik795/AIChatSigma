@@ -54,13 +54,29 @@ function Message({ message }) {
               )}
             </button>
           )}
-          {message.content.split('\n').map((line, i) => (
-            <span key={i}>
-              {line}
-              {i < message.content.split('\n').length - 1 && <br />}
-            </span>
-          ))}
+          {message.content ? (
+            message.content.split('\n').map((line, i) => (
+              <span key={i}>
+                {line}
+                {i < message.content.split('\n').length - 1 && <br />}
+              </span>
+            ))
+          ) : (
+            <span style={{ opacity: 0.5 }}>...</span>
+          )}
         </div>
+        {message.finish_reason === 'length' && !isUser && (
+          <div className="message-warning" style={{ 
+            marginTop: '8px', 
+            padding: '8px', 
+            backgroundColor: 'rgba(255, 193, 7, 0.1)', 
+            borderRadius: '4px',
+            fontSize: '0.875rem',
+            color: '#ffc107'
+          }}>
+            ⚠️ Ответ был обрезан из-за достижения лимита токенов
+          </div>
+        )}
         {message.model && !isUser && (
           <div className="message-model">
             {message.model}

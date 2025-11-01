@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 
 const DEFAULT_SETTINGS = {
   temperature: 1.0,
-  max_tokens: 1000,
+  max_tokens: null,
   verbosity: 'medium',
   frequency_penalty: 0.0,
   top_p: 1.0
@@ -10,7 +10,7 @@ const DEFAULT_SETTINGS = {
 
 const PARAMETER_HINTS = {
   temperature: "Контролирует креативность ответов. Низкие значения = более предсказуемые ответы, высокие = более креативные",
-  max_tokens: "Максимальное количество токенов в ответе. Больше токенов = длиннее ответ (выше стоимость)",
+  max_tokens: "Максимальное количество токенов в ответе. Оставьте пустым для безлимитной генерации. Больше токенов = длиннее ответ (выше стоимость)",
   verbosity: "Детальность ответа. Low = кратко, Medium = сбалансированно, High = подробно",
   frequency_penalty: "Штраф за повторение слов. Положительные значения уменьшают повторения, отрицательные - увеличивают",
   top_p: "Ограничивает выбор токенов. Низкие значения = более предсказуемые ответы, 1.0 = полный выбор"
@@ -31,6 +31,10 @@ function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }) {
       if (saved) {
         try {
           const parsed = JSON.parse(saved)
+          // Если max_tokens === 1000 (старое значение по умолчанию), заменяем на null
+          if (parsed.max_tokens === 1000) {
+            parsed.max_tokens = null
+          }
           setLocalSettings({ ...DEFAULT_SETTINGS, ...parsed })
           onSettingsChange({ ...DEFAULT_SETTINGS, ...parsed })
         } catch (e) {
@@ -134,11 +138,21 @@ function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }) {
                 <input
                   type="number"
                   id="max_tokens"
-                  min="50"
                   max="4000"
                   step="50"
-                  value={localSettings.max_tokens}
-                  onChange={(e) => handleChange('max_tokens', parseInt(e.target.value) || 1000)}
+                  value={localSettings.max_tokens || ''}
+                  placeholder="Без лимита"
+                  onChange={(e) => {
+                    const value = e.target.value
+                    if (value === '' || value === null) {
+                      handleChange('max_tokens', null)
+                    } else {
+                      const parsed = parseInt(value)
+                      if (!isNaN(parsed) && parsed > 0) {
+                        handleChange('max_tokens', parsed)
+                      }
+                    }
+                  }}
                 />
               </div>
             </div>

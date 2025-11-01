@@ -5,7 +5,7 @@ import SettingsPanel from './SettingsPanel'
 
 const DEFAULT_SETTINGS = {
   temperature: 1.0,
-  max_tokens: 1000,
+  max_tokens: null,
   verbosity: 'medium',
   frequency_penalty: 0.0,
   top_p: 1.0
@@ -27,6 +27,10 @@ function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
+        // Если max_tokens === 1000 (старое значение по умолчанию), заменяем на null
+        if (parsed.max_tokens === 1000) {
+          parsed.max_tokens = null
+        }
         setSettings({ ...DEFAULT_SETTINGS, ...parsed })
       } catch (e) {
         console.error('Ошибка загрузки настроек:', e)

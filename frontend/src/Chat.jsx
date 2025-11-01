@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 import Message from './Message'
-import axios from 'axios'
 
 function Chat({ selectedModel, settings }) {
   const [messages, setMessages] = useState([])
@@ -31,6 +30,166 @@ function Chat({ selectedModel, settings }) {
     autoResizeTextarea()
   }, [input])
 
+  const handleStreamingSend = async (userMessage) => {
+    // Создаем placeholder сообщение ассистента
+    const placeholderMessage = {
+      role: 'assistant',
+      content: '',
+      model: selectedModel,
+      isStreaming: true // Флаг для идентификации streaming сообщения
+    }
+    
+    setMessages(prev => [...prev, placeholderMessage])
+    setIsLoading(true)
+
+    try {
+      const requestPayload = {
+        message: userMessage,
+        model: selectedModel,
+        temperature: settings.temperature,
+        verbosity: settings.verbosity,
+        frequency_penalty: settings.frequency_penalty,
+        top_p: settings.top_p
+      }
+      
+      // Передаем max_tokens только если он установлен (не null и > 0)
+      if (settings.max_tokens !== null && settings.max_tokens > 0) {
+        requestPayload.max_tokens = settings.max_tokens
+      }
+      
+      // Отправляем запрос к streaming endpoint
+      const response = await fetch('/api/chat/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestPayload)
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      // Получаем ReadableStream
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      
+      let buffer = ''
+      let accumulatedContent = ''
+      let finalModel = selectedModel
+      let finishReason = null
+      let costInfo = null
+
+      while (true) {
+        const { done, value } = await reader.read()
+        
+        if (done) {
+          break
+        }
+
+        // Декодируем chunk
+        buffer += decoder.decode(value, { stream: true })
+        
+        // Парсим SSE события (формат: "data: {...}\n\n")
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // Оставляем неполную строку в буфере
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6) // Убираем "data: "
+            
+            try {
+              const eventData = JSON.parse(dataStr)
+              
+              // Проверяем на ошибку
+              if (eventData.error) {
+                throw new Error(eventData.error)
+              }
+              
+              // Если поток завершен
+              if (eventData.done) {
+                finalModel = eventData.model || selectedModel
+                finishReason = eventData.finish_reason
+                costInfo = eventData.cost
+                break
+              }
+              
+              // Получаем токен и добавляем к накопленному контенту
+              if (eventData.token) {
+                accumulatedContent += eventData.token
+                
+                // Обновляем последнее сообщение ассистента (streaming)
+                setMessages(prev => {
+                  const newMessages = [...prev]
+                  // Находим последнее сообщение ассистента с флагом isStreaming
+                  for (let i = newMessages.length - 1; i >= 0; i--) {
+                    if (newMessages[i].role === 'assistant' && newMessages[i].isStreaming) {
+                      newMessages[i] = {
+                        ...newMessages[i],
+                        content: accumulatedContent
+                      }
+                      break
+                    }
+                  }
+                  return newMessages
+                })
+                
+                // Автопрокрутка при добавлении нового текста
+                setTimeout(() => scrollToBottom(), 0)
+              }
+            } catch (parseError) {
+              // Игнорируем ошибки парсинга отдельных событий
+              if (parseError.message && !parseError.message.includes('Unexpected token')) {
+                throw parseError
+              }
+            }
+          }
+        }
+      }
+
+      // Финальное обновление сообщения с метаданными (убираем флаг isStreaming)
+      setMessages(prev => {
+        const newMessages = [...prev]
+        // Находим последнее сообщение ассистента с флагом isStreaming
+        for (let i = newMessages.length - 1; i >= 0; i--) {
+          if (newMessages[i].role === 'assistant' && newMessages[i].isStreaming) {
+            newMessages[i] = {
+              ...newMessages[i],
+              content: accumulatedContent,
+              model: finalModel,
+              finish_reason: finishReason,
+              cost: costInfo,
+              isStreaming: undefined // Убираем флаг
+            }
+            break
+          }
+        }
+        return newMessages
+      })
+
+    } catch (error) {
+      // Обновляем сообщение с ошибкой
+      setMessages(prev => {
+        const newMessages = [...prev]
+        // Находим последнее сообщение ассистента с флагом isStreaming
+        for (let i = newMessages.length - 1; i >= 0; i--) {
+          if (newMessages[i].role === 'assistant' && newMessages[i].isStreaming) {
+            newMessages[i] = {
+              ...newMessages[i],
+              content: `Ошибка: ${error.message}`,
+              isError: true,
+              isStreaming: undefined
+            }
+            break
+          }
+        }
+        return newMessages
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleSend = async (e) => {
     e.preventDefault()
     
@@ -48,37 +207,9 @@ function Chat({ selectedModel, settings }) {
     // Добавляем сообщение пользователя
     const newUserMessage = { role: 'user', content: userMessage }
     setMessages(prev => [...prev, newUserMessage])
-    setIsLoading(true)
-
-    try {
-      const response = await axios.post('/api/chat', {
-        message: userMessage,
-        model: selectedModel,
-        temperature: settings.temperature,
-        max_tokens: settings.max_tokens,
-        verbosity: settings.verbosity,
-        frequency_penalty: settings.frequency_penalty,
-        top_p: settings.top_p
-      })
-
-      const assistantMessage = {
-        role: 'assistant',
-        content: response.data.content,
-        model: response.data.model,
-        cost: response.data.cost // Добавляем информацию о стоимости
-      }
-      
-      setMessages(prev => [...prev, assistantMessage])
-    } catch (error) {
-      const errorMessage = {
-        role: 'assistant',
-        content: `Ошибка: ${error.response?.data?.error || error.message}`,
-        isError: true
-      }
-      setMessages(prev => [...prev, errorMessage])
-    } finally {
-      setIsLoading(false)
-    }
+    
+    // Используем streaming отправку
+    await handleStreamingSend(userMessage)
   }
 
   return (
@@ -93,7 +224,7 @@ function Chat({ selectedModel, settings }) {
         {messages.map((message, index) => (
           <Message key={index} message={message} />
         ))}
-        {isLoading && (
+        {isLoading && !messages.some(msg => msg.role === 'assistant' && msg.isStreaming) && (
           <div className="message assistant loading">
             <div className="message-content">
               <div className="typing-indicator">
