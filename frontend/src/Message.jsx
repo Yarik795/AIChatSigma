@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 function Message({ message }) {
   const isUser = message.role === 'user'
@@ -55,12 +57,9 @@ function Message({ message }) {
             </button>
           )}
           {message.content ? (
-            message.content.split('\n').map((line, i) => (
-              <span key={i}>
-                {line}
-                {i < message.content.split('\n').length - 1 && <br />}
-              </span>
-            ))
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {message.content}
+            </ReactMarkdown>
           ) : (
             <span style={{ opacity: 0.5 }}>...</span>
           )}
