@@ -58,16 +58,45 @@ function Chat({ selectedModel, settings }) {
       }
       
       // Отправляем запрос к streaming endpoint
-      const response = await fetch('/api/chat/stream', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestPayload)
-      })
+      let response
+      try {
+        response = await fetch('/api/chat/stream', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestPayload)
+        })
+      } catch (fetchError) {
+        // Обработка сетевых ошибок (network error, CORS, timeout и т.д.)
+        if (fetchError instanceof TypeError && fetchError.message.includes('fetch')) {
+          throw new Error('Ошибка сети: не удалось подключиться к серверу. Проверьте подключение к интернету.')
+        }
+        throw new Error(`Ошибка сети: ${fetchError.message || 'Неизвестная ошибка'}`)
+      }
+
+      if (!response) {
+        throw new Error('Не получен ответ от сервера')
+      }
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        // Пытаемся получить детали ошибки из ответа
+        let errorMessage = `Ошибка HTTP ${response.status}`
+        try {
+          const errorData = await response.json()
+          if (errorData.error) {
+            errorMessage = errorData.error
+          }
+        } catch {
+          // Если не удалось распарсить JSON, используем стандартное сообщение
+          errorMessage = `Ошибка HTTP ${response.status}: ${response.statusText || 'Неизвестная ошибка'}`
+        }
+        throw new Error(errorMessage)
+      }
+
+      // Проверяем наличие body перед чтением
+      if (!response.body) {
+        throw new Error('Пустой ответ от сервера')
       }
 
       // Получаем ReadableStream
@@ -80,70 +109,97 @@ function Chat({ selectedModel, settings }) {
       let finishReason = null
       let costInfo = null
 
-      while (true) {
-        const { done, value } = await reader.read()
-        
-        if (done) {
-          break
-        }
+      try {
+        while (true) {
+          let readResult
+          try {
+            readResult = await reader.read()
+          } catch (readError) {
+            // Ошибка при чтении потока (может быть из-за обрыва соединения)
+            throw new Error(`Ошибка чтения потока данных: ${readError.message || 'Соединение прервано'}`)
+          }
+          
+          const { done, value } = readResult
+          
+          if (done) {
+            break
+          }
 
-        // Декодируем chunk
-        buffer += decoder.decode(value, { stream: true })
-        
-        // Парсим SSE события (формат: "data: {...}\n\n")
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || '' // Оставляем неполную строку в буфере
+          // Проверяем наличие данных
+          if (value === undefined || value === null) {
+            throw new Error('Получены пустые данные из потока')
+          }
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const dataStr = line.slice(6) // Убираем "data: "
-            
-            try {
-              const eventData = JSON.parse(dataStr)
+          // Декодируем chunk
+          try {
+            buffer += decoder.decode(value, { stream: true })
+          } catch (decodeError) {
+            throw new Error(`Ошибка декодирования данных: ${decodeError.message}`)
+          }
+          
+          // Парсим SSE события (формат: "data: {...}\n\n")
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || '' // Оставляем неполную строку в буфере
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const dataStr = line.slice(6) // Убираем "data: "
               
-              // Проверяем на ошибку
-              if (eventData.error) {
-                throw new Error(eventData.error)
-              }
-              
-              // Если поток завершен
-              if (eventData.done) {
-                finalModel = eventData.model || selectedModel
-                finishReason = eventData.finish_reason
-                costInfo = eventData.cost
-                break
-              }
-              
-              // Получаем токен и добавляем к накопленному контенту
-              if (eventData.token) {
-                accumulatedContent += eventData.token
+              try {
+                const eventData = JSON.parse(dataStr)
                 
-                // Обновляем последнее сообщение ассистента (streaming)
-                setMessages(prev => {
-                  const newMessages = [...prev]
-                  // Находим последнее сообщение ассистента с флагом isStreaming
-                  for (let i = newMessages.length - 1; i >= 0; i--) {
-                    if (newMessages[i].role === 'assistant' && newMessages[i].isStreaming) {
-                      newMessages[i] = {
-                        ...newMessages[i],
-                        content: accumulatedContent
+                // Проверяем на ошибку
+                if (eventData.error) {
+                  throw new Error(eventData.error)
+                }
+                
+                // Если поток завершен
+                if (eventData.done) {
+                  finalModel = eventData.model || selectedModel
+                  finishReason = eventData.finish_reason
+                  costInfo = eventData.cost
+                  break
+                }
+                
+                // Получаем токен и добавляем к накопленному контенту
+                if (eventData.token) {
+                  accumulatedContent += eventData.token
+                  
+                  // Обновляем последнее сообщение ассистента (streaming)
+                  setMessages(prev => {
+                    const newMessages = [...prev]
+                    // Находим последнее сообщение ассистента с флагом isStreaming
+                    for (let i = newMessages.length - 1; i >= 0; i--) {
+                      if (newMessages[i].role === 'assistant' && newMessages[i].isStreaming) {
+                        newMessages[i] = {
+                          ...newMessages[i],
+                          content: accumulatedContent
+                        }
+                        break
                       }
-                      break
                     }
-                  }
-                  return newMessages
-                })
-                
-                // Автопрокрутка при добавлении нового текста
-                setTimeout(() => scrollToBottom(), 0)
-              }
-            } catch (parseError) {
-              // Игнорируем ошибки парсинга отдельных событий
-              if (parseError.message && !parseError.message.includes('Unexpected token')) {
-                throw parseError
+                    return newMessages
+                  })
+                  
+                  // Автопрокрутка при добавлении нового текста
+                  setTimeout(() => scrollToBottom(), 0)
+                }
+              } catch (parseError) {
+                // Игнорируем ошибки парсинга отдельных событий (некорректный JSON)
+                if (parseError.message && !parseError.message.includes('Unexpected token') && !parseError.message.includes('JSON')) {
+                  // Если это не ошибка парсинга JSON, а реальная ошибка - пробрасываем дальше
+                  throw parseError
+                }
               }
             }
           }
+        }
+      } finally {
+        // Закрываем reader в любом случае
+        try {
+          reader.releaseLock()
+        } catch (e) {
+          // Игнорируем ошибки при закрытии
         }
       }
 
@@ -168,6 +224,27 @@ function Chat({ selectedModel, settings }) {
       })
 
     } catch (error) {
+      // Определяем понятное сообщение об ошибке
+      let errorMessage = 'Произошла ошибка'
+      
+      if (error instanceof TypeError) {
+        // Сетевые ошибки (network error, CORS, etc.)
+        if (error.message.includes('fetch') || error.message.includes('Failed to fetch')) {
+          errorMessage = 'Ошибка сети: не удалось подключиться к серверу. Проверьте подключение к интернету и убедитесь, что сервер запущен.'
+        } else {
+          errorMessage = `Ошибка сети: ${error.message}`
+        }
+      } else if (error instanceof Error) {
+        // Ошибки с сообщением
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        // Строковые ошибки
+        errorMessage = error
+      } else {
+        // Прочие ошибки
+        errorMessage = `Неизвестная ошибка: ${String(error)}`
+      }
+      
       // Обновляем сообщение с ошибкой
       setMessages(prev => {
         const newMessages = [...prev]
@@ -176,7 +253,7 @@ function Chat({ selectedModel, settings }) {
           if (newMessages[i].role === 'assistant' && newMessages[i].isStreaming) {
             newMessages[i] = {
               ...newMessages[i],
-              content: `Ошибка: ${error.message}`,
+              content: `❌ ${errorMessage}`,
               isError: true,
               isStreaming: undefined
             }
@@ -185,6 +262,9 @@ function Chat({ selectedModel, settings }) {
         }
         return newMessages
       })
+      
+      // Логируем ошибку в консоль для отладки
+      console.error('Ошибка при отправке сообщения:', error)
     } finally {
       setIsLoading(false)
     }

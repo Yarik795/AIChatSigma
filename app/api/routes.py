@@ -404,85 +404,106 @@ def chat_stream():
                 usage_data = None
                 
                 # Парсим потоковые данные от OpenRouter
-                for line in response.iter_lines():
-                    if not line:
-                        continue
-                    
-                    # Декодируем строку
-                    line_str = line.decode('utf-8')
-                    
-                    # Пропускаем служебные строки SSE
-                    if line_str.startswith('data: '):
-                        data_str = line_str[6:]  # Убираем "data: "
-                        
-                        # Проверяем на завершение потока
-                        if data_str.strip() == '[DONE]':
-                            # Отправляем финальное сообщение с метаданными
-                            final_data = {
-                                'token': '',
-                                'done': True,
-                                'model': used_model,
-                                'finish_reason': finish_reason
-                            }
-                            
-                            # Добавляем информацию о стоимости, если доступна
-                            if usage_data:
-                                cost_info = calculate_cost_rub({'usage': usage_data, 'model': used_model}, used_model)
-                                if cost_info:
-                                    final_data['cost'] = {
-                                        'total_cost_rub': cost_info['total_cost_rub'],
-                                        'prompt_tokens': cost_info['prompt_tokens'],
-                                        'completion_tokens': cost_info['completion_tokens'],
-                                        'total_tokens': cost_info['total_tokens']
-                                    }
-                                    
-                                    # Логируем стоимость
-                                    logger.info("=" * 60)
-                                    logger.info(f"СТОИМОСТЬ STREAMING ЗАПРОСА:")
-                                    logger.info(f"Модель: {used_model}")
-                                    logger.info(f"Токенов (prompt/completion/total): {cost_info['prompt_tokens']}/{cost_info['completion_tokens']}/{cost_info['total_tokens']}")
-                                    logger.info(f"Общая стоимость: {cost_info['total_cost_rub']:.2f} руб.")
-                                    logger.info("=" * 60)
-                            
-                            yield f"data: {json.dumps(final_data, ensure_ascii=False)}\n\n"
-                            break
-                        
-                        # Парсим JSON данные
-                        try:
-                            chunk_data = json.loads(data_str)
-                            
-                            # Извлекаем модель из первого чанка
-                            if 'model' in chunk_data:
-                                used_model = chunk_data['model']
-                            
-                            # Извлекаем usage данные (приходят в последнем чанке)
-                            if 'usage' in chunk_data:
-                                usage_data = chunk_data['usage']
-                            
-                            # Извлекаем содержимое токена
-                            if 'choices' in chunk_data and len(chunk_data['choices']) > 0:
-                                choice = chunk_data['choices'][0]
-                                
-                                # Получаем delta контент
-                                delta = choice.get('delta', {})
-                                token_content = delta.get('content', '')
-                                
-                                # Получаем finish_reason (если есть)
-                                if 'finish_reason' in choice:
-                                    finish_reason = choice['finish_reason']
-                                
-                                # Если есть новый токен, отправляем его клиенту
-                                if token_content:
-                                    accumulated_content += token_content
-                                    event_data = {
-                                        'token': token_content,
-                                        'done': False
-                                    }
-                                    yield f"data: {json.dumps(event_data, ensure_ascii=False)}\n\n"
-                        
-                        except json.JSONDecodeError:
-                            # Пропускаем некорректные JSON строки
+                try:
+                    for line in response.iter_lines():
+                        if not line:
                             continue
+                        
+                        # Декодируем строку
+                        try:
+                            line_str = line.decode('utf-8')
+                        except UnicodeDecodeError as decode_error:
+                            logger.warning(f"Ошибка декодирования строки: {decode_error}")
+                            continue
+                        
+                        # Пропускаем служебные строки SSE
+                        if line_str.startswith('data: '):
+                            data_str = line_str[6:]  # Убираем "data: "
+                            
+                            # Проверяем на завершение потока
+                            if data_str.strip() == '[DONE]':
+                                # Отправляем финальное сообщение с метаданными
+                                final_data = {
+                                    'token': '',
+                                    'done': True,
+                                    'model': used_model,
+                                    'finish_reason': finish_reason
+                                }
+                                
+                                # Добавляем информацию о стоимости, если доступна
+                                if usage_data:
+                                    cost_info = calculate_cost_rub({'usage': usage_data, 'model': used_model}, used_model)
+                                    if cost_info:
+                                        final_data['cost'] = {
+                                            'total_cost_rub': cost_info['total_cost_rub'],
+                                            'prompt_tokens': cost_info['prompt_tokens'],
+                                            'completion_tokens': cost_info['completion_tokens'],
+                                            'total_tokens': cost_info['total_tokens']
+                                        }
+                                        
+                                        # Логируем стоимость
+                                        logger.info("=" * 60)
+                                        logger.info(f"СТОИМОСТЬ STREAMING ЗАПРОСА:")
+                                        logger.info(f"Модель: {used_model}")
+                                        logger.info(f"Токенов (prompt/completion/total): {cost_info['prompt_tokens']}/{cost_info['completion_tokens']}/{cost_info['total_tokens']}")
+                                        logger.info(f"Общая стоимость: {cost_info['total_cost_rub']:.2f} руб.")
+                                        logger.info("=" * 60)
+                                
+                                yield f"data: {json.dumps(final_data, ensure_ascii=False)}\n\n"
+                                break
+                            
+                            # Парсим JSON данные
+                            try:
+                                chunk_data = json.loads(data_str)
+                                
+                                # Извлекаем модель из первого чанка
+                                if 'model' in chunk_data:
+                                    used_model = chunk_data['model']
+                                
+                                # Извлекаем usage данные (приходят в последнем чанке)
+                                if 'usage' in chunk_data:
+                                    usage_data = chunk_data['usage']
+                                
+                                # Извлекаем содержимое токена
+                                if 'choices' in chunk_data and len(chunk_data['choices']) > 0:
+                                    choice = chunk_data['choices'][0]
+                                    
+                                    # Получаем delta контент
+                                    delta = choice.get('delta', {})
+                                    token_content = delta.get('content', '')
+                                    
+                                    # Получаем finish_reason (если есть)
+                                    if 'finish_reason' in choice:
+                                        finish_reason = choice['finish_reason']
+                                    
+                                    # Если есть новый токен, отправляем его клиенту
+                                    if token_content:
+                                        accumulated_content += token_content
+                                        event_data = {
+                                            'token': token_content,
+                                            'done': False
+                                        }
+                                        yield f"data: {json.dumps(event_data, ensure_ascii=False)}\n\n"
+                            
+                            except json.JSONDecodeError:
+                                # Пропускаем некорректные JSON строки
+                                continue
+                except requests.exceptions.ChunkedEncodingError as e:
+                    # Ошибка при чтении chunked потока (обрыв соединения)
+                    logger.error(f"Ошибка чтения потока данных: {e}")
+                    error_event = {
+                        'error': 'Ошибка чтения потока данных: соединение прервано',
+                        'status_code': 500
+                    }
+                    yield f"data: {json.dumps(error_event, ensure_ascii=False)}\n\n"
+                except requests.exceptions.ConnectionError as e:
+                    # Ошибка подключения
+                    logger.error(f"Ошибка подключения к OpenRouter: {e}")
+                    error_event = {
+                        'error': f'Ошибка подключения к OpenRouter: {str(e)}',
+                        'status_code': 503
+                    }
+                    yield f"data: {json.dumps(error_event, ensure_ascii=False)}\n\n"
                 
             except requests.exceptions.Timeout:
                 error_event = {
