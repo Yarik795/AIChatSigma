@@ -1,12 +1,28 @@
 import { useState, useEffect } from 'react'
 
-const DEFAULT_SETTINGS = {
+// Предустановка для деловой переписки (новые значения по умолчанию)
+const BUSINESS_CORRESPONDENCE_SETTINGS = {
+  temperature: 0.3,
+  max_tokens: null,
+  verbosity: 'medium',
+  frequency_penalty: 0.3,
+  top_p: 0.9
+}
+
+// Классические настройки (старые значения по умолчанию)
+const CLASSIC_SETTINGS = {
   temperature: 1.0,
   max_tokens: null,
   verbosity: 'medium',
   frequency_penalty: 0.0,
   top_p: 1.0
 }
+
+// Используем настройки деловой переписки как значения по умолчанию
+const DEFAULT_SETTINGS = BUSINESS_CORRESPONDENCE_SETTINGS
+
+// Экспортируем для использования в других компонентах
+export { BUSINESS_CORRESPONDENCE_SETTINGS, CLASSIC_SETTINGS, DEFAULT_SETTINGS }
 
 const PARAMETER_HINTS = {
   temperature: "Контролирует креативность ответов. Низкие значения = более предсказуемые ответы, высокие = более креативные",
@@ -17,7 +33,22 @@ const PARAMETER_HINTS = {
 }
 
 function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }) {
-  const [localSettings, setLocalSettings] = useState(settings)
+  const [localSettings, setLocalSettings] = useState(() => {
+    // Инициализируем из localStorage или используем переданные settings
+    const saved = localStorage.getItem('chatSettings')
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (parsed.max_tokens === 1000) {
+          parsed.max_tokens = null
+        }
+        return { ...DEFAULT_SETTINGS, ...parsed }
+      } catch (e) {
+        return DEFAULT_SETTINGS
+      }
+    }
+    return settings || DEFAULT_SETTINGS
+  })
   const [tooltipKey, setTooltipKey] = useState(null)
 
   useEffect(() => {
@@ -39,7 +70,15 @@ function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }) {
           onSettingsChange({ ...DEFAULT_SETTINGS, ...parsed })
         } catch (e) {
           console.error('Ошибка загрузки настроек:', e)
+          // При ошибке используем значения по умолчанию
+          setLocalSettings(DEFAULT_SETTINGS)
+          onSettingsChange(DEFAULT_SETTINGS)
         }
+      } else {
+        // Если нет сохраненных настроек, применяем значения по умолчанию
+        setLocalSettings(DEFAULT_SETTINGS)
+        onSettingsChange(DEFAULT_SETTINGS)
+        localStorage.setItem('chatSettings', JSON.stringify(DEFAULT_SETTINGS))
       }
     }
   }, [isOpen])
@@ -52,10 +91,16 @@ function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }) {
     localStorage.setItem('chatSettings', JSON.stringify(newSettings))
   }
 
+  const handleBusinessCorrespondence = () => {
+    setLocalSettings(BUSINESS_CORRESPONDENCE_SETTINGS)
+    onSettingsChange(BUSINESS_CORRESPONDENCE_SETTINGS)
+    localStorage.setItem('chatSettings', JSON.stringify(BUSINESS_CORRESPONDENCE_SETTINGS))
+  }
+
   const handleReset = () => {
-    setLocalSettings(DEFAULT_SETTINGS)
-    onSettingsChange(DEFAULT_SETTINGS)
-    localStorage.setItem('chatSettings', JSON.stringify(DEFAULT_SETTINGS))
+    setLocalSettings(CLASSIC_SETTINGS)
+    onSettingsChange(CLASSIC_SETTINGS)
+    localStorage.setItem('chatSettings', JSON.stringify(CLASSIC_SETTINGS))
   }
 
   const handleOverlayClick = (e) => {
@@ -258,10 +303,13 @@ function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }) {
             </div>
           </div>
 
-          {/* Кнопка сброса */}
+          {/* Кнопки предустановок */}
           <div className="settings-footer">
+            <button className="settings-reset-button" onClick={handleBusinessCorrespondence}>
+              Деловая переписка
+            </button>
             <button className="settings-reset-button" onClick={handleReset}>
-              Сбросить к умолчаниям
+              Сброс
             </button>
           </div>
         </div>

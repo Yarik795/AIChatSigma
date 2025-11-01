@@ -1,15 +1,7 @@
 import { useState, useEffect } from 'react'
 import Chat from './Chat'
 import ModelSelector from './ModelSelector'
-import SettingsPanel from './SettingsPanel'
-
-const DEFAULT_SETTINGS = {
-  temperature: 1.0,
-  max_tokens: null,
-  verbosity: 'medium',
-  frequency_penalty: 0.0,
-  top_p: 1.0
-}
+import SettingsPanel, { DEFAULT_SETTINGS } from './SettingsPanel'
 
 function App() {
   const [selectedModel, setSelectedModel] = useState('google/gemini-2.5-pro')
@@ -34,7 +26,14 @@ function App() {
         setSettings({ ...DEFAULT_SETTINGS, ...parsed })
       } catch (e) {
         console.error('Ошибка загрузки настроек:', e)
+        // При ошибке используем значения по умолчанию
+        setSettings(DEFAULT_SETTINGS)
+        localStorage.setItem('chatSettings', JSON.stringify(DEFAULT_SETTINGS))
       }
+    } else {
+      // Если нет сохраненных настроек, применяем и сохраняем значения по умолчанию
+      setSettings(DEFAULT_SETTINGS)
+      localStorage.setItem('chatSettings', JSON.stringify(DEFAULT_SETTINGS))
     }
   }, [])
 
