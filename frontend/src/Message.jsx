@@ -31,19 +31,21 @@ function Message({ message }) {
     }
   }
 
+  const isStreamingEmpty = message.isStreaming && !message.content
+
   return (
-    <div className={`message ${message.role} ${isError ? 'error' : ''}`}>
+    <div className={`message ${message.role} ${isError ? 'error' : ''} ${isStreamingEmpty ? 'loading' : ''}`}>
       <div className="message-avatar">
         {isUser ? '👤' : '🤖'}
       </div>
       <div className="message-content">
         <div className="message-text">
-          {!isUser && (
+          {!isStreamingEmpty && (
             <button 
               className="copy-button"
               onClick={handleCopy}
-              title={copied ? 'Скопировано!' : 'Копировать ответ'}
-              aria-label="Копировать ответ"
+              title={copied ? 'Скопировано!' : 'Копировать сообщение'}
+              aria-label="Копировать сообщение"
             >
               {copied ? (
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -56,7 +58,13 @@ function Message({ message }) {
               )}
             </button>
           )}
-          {message.content ? (
+          {isStreamingEmpty ? (
+            <div className="typing-indicator">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          ) : message.content ? (
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {message.content}
             </ReactMarkdown>
@@ -76,7 +84,7 @@ function Message({ message }) {
             ⚠️ Ответ был обрезан из-за достижения лимита токенов
           </div>
         )}
-        {message.model && !isUser && (
+        {message.model && !isUser && !message.isStreaming && (
           <div className="message-model">
             {message.model}
             {message.cost && (

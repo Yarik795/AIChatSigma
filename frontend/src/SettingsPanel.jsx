@@ -6,7 +6,8 @@ const BUSINESS_CORRESPONDENCE_SETTINGS = {
   max_tokens: null,
   verbosity: 'medium',
   frequency_penalty: 0.3,
-  top_p: 0.9
+  top_p: 0.9,
+  use_system_prompt: true
 }
 
 // Классические настройки (старые значения по умолчанию)
@@ -15,14 +16,18 @@ const CLASSIC_SETTINGS = {
   max_tokens: null,
   verbosity: 'medium',
   frequency_penalty: 0.0,
-  top_p: 1.0
+  top_p: 1.0,
+  use_system_prompt: true
 }
 
 // Используем настройки деловой переписки как значения по умолчанию
 const DEFAULT_SETTINGS = BUSINESS_CORRESPONDENCE_SETTINGS
 
+// Значение по умолчанию для показа оценки стоимости
+const DEFAULT_SHOW_COST_ESTIMATE = true
+
 // Экспортируем для использования в других компонентах
-export { BUSINESS_CORRESPONDENCE_SETTINGS, CLASSIC_SETTINGS, DEFAULT_SETTINGS }
+export { BUSINESS_CORRESPONDENCE_SETTINGS, CLASSIC_SETTINGS, DEFAULT_SETTINGS, DEFAULT_SHOW_COST_ESTIMATE }
 
 const PARAMETER_HINTS = {
   temperature: "Контролирует креативность ответов. Низкие значения = более предсказуемые ответы, высокие = более креативные",
@@ -49,11 +54,34 @@ function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }) {
     }
     return settings || DEFAULT_SETTINGS
   })
+  const [showCostEstimate, setShowCostEstimate] = useState(() => {
+    const saved = localStorage.getItem('showCostEstimate')
+    return saved !== null ? saved === 'true' : DEFAULT_SHOW_COST_ESTIMATE
+  })
   const [tooltipKey, setTooltipKey] = useState(null)
+  const [systemPrompt, setSystemPrompt] = useState('')
+  const [isLoadingPrompt, setIsLoadingPrompt] = useState(false)
 
   useEffect(() => {
     setLocalSettings(settings)
   }, [settings])
+
+  const fetchSystemPrompt = async () => {
+    setIsLoadingPrompt(true)
+    try {
+      const response = await fetch('/api/system-prompt')
+      if (!response.ok) {
+        throw new Error('Ошибка загрузки системного промпта')
+      }
+      const data = await response.json()
+      setSystemPrompt(data.prompt || '')
+    } catch (error) {
+      console.error('Ошибка при загрузке системного промпта:', error)
+      setSystemPrompt('Не удалось загрузить системный промпт')
+    } finally {
+      setIsLoadingPrompt(false)
+    }
+  }
 
   useEffect(() => {
     if (isOpen) {
@@ -80,8 +108,22 @@ function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }) {
         onSettingsChange(DEFAULT_SETTINGS)
         localStorage.setItem('chatSettings', JSON.stringify(DEFAULT_SETTINGS))
       }
+      
+      // Загружаем системный промпт
+      fetchSystemPrompt()
     }
   }, [isOpen])
+
+  const handleCopyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(systemPrompt)
+      // Можно добавить визуальную обратную связь (например, временно изменить текст кнопки)
+      alert('Системный промпт скопирован в буфер обмена')
+    } catch (error) {
+      console.error('Ошибка при копировании:', error)
+      alert('Не удалось скопировать промпт')
+    }
+  }
 
   const handleChange = (key, value) => {
     const newSettings = { ...localSettings, [key]: value }
@@ -103,10 +145,31 @@ function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }) {
     localStorage.setItem('chatSettings', JSON.stringify(CLASSIC_SETTINGS))
   }
 
+  const handleToggleCostEstimate = (checked) => {
+    setShowCostEstimate(checked)
+    localStorage.setItem('showCostEstimate', checked.toString())
+  }
+
   const handleOverlayClick = (e) => {
     if (e.target === e.currentTarget) {
       onClose()
     }
+  }
+
+  // Проверка соответствия текущих настроек пресету "Деловая переписка"
+  const isBusinessCorrespondenceActive = () => {
+    const current = localSettings
+    const preset = BUSINESS_CORRESPONDENCE_SETTINGS
+    
+    // Сравниваем все ключевые параметры
+    return (
+      Math.abs(current.temperature - preset.temperature) < 0.01 &&
+      current.max_tokens === preset.max_tokens &&
+      current.verbosity === preset.verbosity &&
+      Math.abs(current.frequency_penalty - preset.frequency_penalty) < 0.01 &&
+      Math.abs(current.top_p - preset.top_p) < 0.01 &&
+      current.use_system_prompt === preset.use_system_prompt
+    )
   }
 
   if (!isOpen) return null
@@ -303,9 +366,78 @@ function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }) {
             </div>
           </div>
 
+          {/* Интерфейс */}
+          <div className="settings-section">
+            <h3>Интерфейс</h3>
+
+            {/* Показывать оценку стоимости */}
+            <div className="setting-item">
+              <div className="setting-label">
+                <label htmlFor="show-cost-estimate">Показывать оценку стоимости</label>
+              </div>
+              <div className="setting-control">
+                <input
+                  type="checkbox"
+                  id="show-cost-estimate"
+                  checked={showCostEstimate}
+                  onChange={(e) => handleToggleCostEstimate(e.target.checked)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Системный промпт */}
+          <div className="settings-section">
+            <h3>Системный промпт</h3>
+            <div className="setting-item">
+              <div className="setting-label">
+                <label htmlFor="system-prompt">Текущий системный промпт</label>
+              </div>
+              <div className="setting-control">
+                {isLoadingPrompt ? (
+                  <div className="prompt-loading">Загрузка...</div>
+                ) : (
+                  <>
+                    <textarea
+                      id="system-prompt"
+                      className="system-prompt-textarea"
+                      readOnly={true}
+                      value={systemPrompt}
+                      rows={10}
+                    />
+                    <button
+                      type="button"
+                      className="settings-copy-button"
+                      onClick={handleCopyPrompt}
+                      disabled={!systemPrompt || isLoadingPrompt}
+                    >
+                      Копировать
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="setting-item">
+              <div className="setting-label">
+                <label htmlFor="use-system-prompt">Использовать системный промпт</label>
+              </div>
+              <div className="setting-control">
+                <input
+                  type="checkbox"
+                  id="use-system-prompt"
+                  checked={localSettings.use_system_prompt !== false}
+                  onChange={(e) => handleChange('use_system_prompt', e.target.checked)}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Кнопки предустановок */}
           <div className="settings-footer">
-            <button className="settings-reset-button" onClick={handleBusinessCorrespondence}>
+            <button 
+              className={`settings-reset-button ${isBusinessCorrespondenceActive() ? 'active' : ''}`}
+              onClick={handleBusinessCorrespondence}
+            >
               Деловая переписка
             </button>
             <button className="settings-reset-button" onClick={handleReset}>

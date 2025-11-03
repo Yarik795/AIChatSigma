@@ -13,6 +13,16 @@ MODELS_API_URL = "https://openrouter.ai/api/v1/models"
 # Кэш для тарифов моделей (чтобы не запрашивать каждый раз)
 _model_pricing_cache = {}
 
+# Коэффициенты для оценки токенов
+# Примерное соотношение: для русского языка ~2-2.5 символа на токен, для английского ~3-4 символа
+# Используем консервативное значение 2.5 для смешанного контента
+CHARS_PER_TOKEN_RU = 2.5  # для русского текста
+CHARS_PER_TOKEN_EN = 4.0  # для английского текста
+DEFAULT_CHARS_PER_TOKEN = 2.7  # усреднённое значение для смешанного контента
+
+# Средняя оценка выходных токенов (если max_tokens не задан)
+DEFAULT_COMPLETION_TOKENS = 400  # средний ответ ассистента
+
 
 def get_model_pricing(model_id: str) -> dict:
     """
@@ -130,5 +140,120 @@ def calculate_cost_rub(response_data: dict, model_id: str = None) -> dict:
             'completion_cost_rub': completion_cost_rub,
             'request_cost_rub': request_cost_rub
         }
+    }
+
+
+def estimate_token_count(text: str) -> int:
+    """
+    Оценивает количество токенов в тексте на основе приблизительного соотношения.
+    
+    Args:
+        text: Текст для оценки
+    
+    Returns:
+        int: Приблизительное количество токенов
+    """
+    if not text:
+        return 0
+    
+    # Определяем соотношение символов к токенам на основе языка
+    # Простая эвристика: если много кириллицы, используем коэффициент для русского
+    cyrillic_count = sum(1 for char in text if '\u0400' <= char <= '\u04FF')
+    total_chars = len(text)
+    
+    if total_chars == 0:
+        return 0
+    
+    # Если больше 30% кириллицы - используем коэффициент для русского
+    if cyrillic_count / total_chars > 0.3:
+        chars_per_token = CHARS_PER_TOKEN_RU
+    else:
+        chars_per_token = CHARS_PER_TOKEN_EN
+    
+    # Оцениваем количество токенов
+    estimated_tokens = int(text.count(' ') + 1)  # минимальная оценка по словам
+    # Уточняем оценку по символам
+    estimated_by_chars = int(total_chars / chars_per_token)
+    
+    # Берем максимум из двух оценок (более консервативный подход)
+    return max(estimated_tokens, estimated_by_chars)
+
+
+def estimate_cost_rub(
+    message: str,
+    model_id: str,
+    history: list = None,
+    system_prompt: str = None,
+    max_tokens: int = None
+) -> dict:
+    """
+    Оценивает стоимость запроса в рублях ДО отправки.
+    
+    Args:
+        message: Текст запроса пользователя
+        model_id: ID модели для запроса
+        history: История сообщений (список dict с 'role' и 'content')
+        system_prompt: Системный промпт (если используется)
+        max_tokens: Максимальное количество токенов для ответа (если задано)
+    
+    Returns:
+        dict: {
+            'estimated_cost_rub': float,  # Оценка стоимости в рублях
+            'estimated_prompt_tokens': int,
+            'estimated_completion_tokens': int,
+            'estimated_total_tokens': int
+        } или None если не удалось оценить
+    """
+    if not message or not model_id:
+        return None
+    
+    # Получаем тарифы модели
+    pricing = get_model_pricing(model_id)
+    if not pricing:
+        return None
+    
+    # Оцениваем токены входных данных
+    prompt_tokens = 0
+    
+    # Системный промпт
+    if system_prompt:
+        prompt_tokens += estimate_token_count(system_prompt)
+    
+    # История сообщений
+    if history:
+        for msg in history:
+            if isinstance(msg, dict):
+                content = msg.get('content', '')
+                if content:
+                    prompt_tokens += estimate_token_count(content)
+                    # Добавляем небольшой overhead на метаданные (role и форматирование)
+                    prompt_tokens += 4
+    
+    # Текущее сообщение пользователя
+    prompt_tokens += estimate_token_count(message)
+    prompt_tokens += 4  # overhead на метаданные
+    
+    # Оцениваем выходные токены
+    if max_tokens and max_tokens > 0:
+        completion_tokens = max_tokens
+    else:
+        completion_tokens = DEFAULT_COMPLETION_TOKENS
+    
+    total_tokens = prompt_tokens + completion_tokens
+    
+    # Рассчитываем стоимость в USD
+    prompt_cost_usd = prompt_tokens * pricing['prompt']
+    completion_cost_usd = completion_tokens * pricing['completion']
+    request_cost_usd = pricing['request']
+    total_cost_usd = prompt_cost_usd + completion_cost_usd + request_cost_usd
+    
+    # Конвертируем в рубли и округляем до копеек
+    estimated_cost_rub = round(total_cost_usd * USD_TO_RUB, 2)
+    
+    return {
+        'estimated_cost_rub': estimated_cost_rub,
+        'estimated_prompt_tokens': prompt_tokens,
+        'estimated_completion_tokens': completion_tokens,
+        'estimated_total_tokens': total_tokens
     }
 

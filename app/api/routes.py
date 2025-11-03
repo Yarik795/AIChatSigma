@@ -7,7 +7,7 @@ import json
 import time
 import requests
 from flask import Blueprint, request, jsonify, Response, stream_with_context
-from app.api.cost_calculator import calculate_cost_rub
+from app.api.cost_calculator import calculate_cost_rub, estimate_cost_rub
 from app.config.prompt_loader import get_system_prompt
 
 # Настройка логирования
@@ -60,6 +60,8 @@ def chat():
         verbosity = data.get('verbosity')
         frequency_penalty = data.get('frequency_penalty')
         top_p = data.get('top_p')
+        history = data.get('history')
+        use_system_prompt = data.get('use_system_prompt', True)
         
         # Валидация параметров (если переданы)
         if temperature is not None:
@@ -102,6 +104,33 @@ def chat():
             except (ValueError, TypeError):
                 return jsonify({'error': 'top_p должен быть числом'}), 400
         
+        # Валидация истории (если передана)
+        validated_history = []
+        if history is not None:
+            if not isinstance(history, list):
+                return jsonify({'error': 'history должен быть массивом'}), 400
+            
+            # Валидируем каждое сообщение в истории
+            for i, msg in enumerate(history):
+                if not isinstance(msg, dict):
+                    return jsonify({'error': f'Сообщение {i} в history должно быть объектом'}), 400
+                
+                role = msg.get('role')
+                content = msg.get('content')
+                
+                if role not in ['user', 'assistant']:
+                    return jsonify({'error': f'role в сообщении {i} должен быть "user" или "assistant"'}), 400
+                
+                if not isinstance(content, str):
+                    return jsonify({'error': f'content в сообщении {i} должен быть строкой'}), 400
+                
+                validated_history.append({'role': role, 'content': content})
+            
+            # Ограничиваем историю последними 50 сообщениями для предотвращения превышения лимитов токенов
+            if len(validated_history) > 50:
+                validated_history = validated_history[-50:]
+                logger.warning(f"История обрезана до последних 50 сообщений")
+        
         # Получаем API ключ из переменных окружения
         api_key = os.environ.get('OPENROUTER_API_KEY')
         if not api_key:
@@ -119,11 +148,18 @@ def chat():
         if http_referer:
             headers['HTTP-Referer'] = http_referer
         
-        # Формируем массив сообщений с системным промптом
+        # Формируем массив сообщений с системным промптом и историей
         messages = []
-        system_prompt = get_system_prompt()
-        if system_prompt:
-            messages.append({'role': 'system', 'content': system_prompt})
+        # Добавляем системный промпт только если он включен в настройках
+        if use_system_prompt is not False:
+            system_prompt = get_system_prompt()
+            if system_prompt:
+                messages.append({'role': 'system', 'content': system_prompt})
+        
+        # Добавляем историю (если есть)
+        messages.extend(validated_history)
+        
+        # Добавляем текущее сообщение пользователя
         messages.append({'role': 'user', 'content': message})
         
         payload = {
@@ -260,6 +296,8 @@ def _validate_chat_params(data):
     verbosity = data.get('verbosity')
     frequency_penalty = data.get('frequency_penalty')
     top_p = data.get('top_p')
+    history = data.get('history')
+    use_system_prompt = data.get('use_system_prompt', True)
     
     # Валидация параметров (если переданы)
     if temperature is not None:
@@ -301,11 +339,47 @@ def _validate_chat_params(data):
         except (ValueError, TypeError):
             return None, None, None, (jsonify({'error': 'top_p должен быть числом'}), 400)
     
-    # Формируем массив сообщений с системным промптом
+    # Валидация истории (если передана)
+    if history is not None:
+        if not isinstance(history, list):
+            return None, None, None, (jsonify({'error': 'history должен быть массивом'}), 400)
+        
+        # Валидируем каждое сообщение в истории
+        validated_history = []
+        for i, msg in enumerate(history):
+            if not isinstance(msg, dict):
+                return None, None, None, (jsonify({'error': f'Сообщение {i} в history должно быть объектом'}), 400)
+            
+            role = msg.get('role')
+            content = msg.get('content')
+            
+            if role not in ['user', 'assistant']:
+                return None, None, None, (jsonify({'error': f'role в сообщении {i} должен быть "user" или "assistant"'}), 400)
+            
+            if not isinstance(content, str):
+                return None, None, None, (jsonify({'error': f'content в сообщении {i} должен быть строкой'}), 400)
+            
+            validated_history.append({'role': role, 'content': content})
+        
+        # Ограничиваем историю последними 50 сообщениями для предотвращения превышения лимитов токенов
+        if len(validated_history) > 50:
+            validated_history = validated_history[-50:]
+            logger.warning(f"История обрезана до последних 50 сообщений")
+    else:
+        validated_history = []
+    
+    # Формируем массив сообщений с системным промптом и историей
     messages = []
-    system_prompt = get_system_prompt()
-    if system_prompt:
-        messages.append({'role': 'system', 'content': system_prompt})
+    # Добавляем системный промпт только если он включен в настройках
+    if use_system_prompt is not False:
+        system_prompt = get_system_prompt()
+        if system_prompt:
+            messages.append({'role': 'system', 'content': system_prompt})
+    
+    # Добавляем историю (если есть)
+    messages.extend(validated_history)
+    
+    # Добавляем текущее сообщение пользователя
     messages.append({'role': 'user', 'content': message})
     
     # Формируем payload
@@ -416,6 +490,8 @@ def chat_stream():
                 # Парсим потоковые данные от OpenRouter
                 try:
                     for line in response.iter_lines():
+                        # Проверяем, не закрыл ли клиент соединение
+                        # Flask автоматически прекратит генератор при закрытии соединения
                         # Проверяем нужно ли отправить keep-alive
                         current_time = time.time()
                         if current_time - last_event_time > keep_alive_interval:
@@ -518,13 +594,10 @@ def chat_stream():
                                 logger.debug(f"Пропущен некорректный JSON: {data_str[:50]}... Ошибка: {json_error}")
                                 continue
                 except requests.exceptions.ChunkedEncodingError as e:
-                    # Ошибка при чтении chunked потока (обрыв соединения)
-                    logger.error(f"Ошибка чтения потока данных: {e}")
-                    error_event = {
-                        'error': 'Ошибка чтения потока данных: соединение прервано',
-                        'status_code': 500
-                    }
-                    yield f"data: {json.dumps(error_event, ensure_ascii=False)}\n\n"
+                    # Ошибка при чтении chunked потока (обрыв соединения или прерывание клиентом)
+                    logger.info(f"Поток данных прерван клиентом или соединение закрыто: {e}")
+                    # Не отправляем ошибку клиенту, так как он уже закрыл соединение
+                    return
                 except requests.exceptions.ConnectionError as e:
                     # Ошибка подключения
                     logger.error(f"Ошибка подключения к OpenRouter: {e}")
@@ -548,7 +621,15 @@ def chat_stream():
                 }
                 yield f"data: {json.dumps(error_event, ensure_ascii=False)}\n\n"
             
+            except GeneratorExit:
+                # Клиент закрыл соединение (прервал запрос)
+                logger.info("Клиент прервал запрос - соединение закрыто")
+                raise  # Пробрасываем дальше для корректного завершения генератора
             except Exception as e:
+                # Проверяем, не было ли соединение закрыто вообще
+                if 'Broken pipe' in str(e) or 'Connection closed' in str(e):
+                    logger.info(f"Соединение закрыто клиентом: {e}")
+                    return  # Не нужно отправлять ошибку если соединение уже закрыто
                 error_event = {
                     'error': f'Внутренняя ошибка сервера: {str(e)}',
                     'status_code': 500
@@ -569,3 +650,121 @@ def chat_stream():
     except Exception as e:
         return jsonify({'error': f'Внутренняя ошибка сервера: {str(e)}'}), 500
 
+
+@api_bp.route('/system-prompt', methods=['GET'])
+def get_system_prompt_endpoint():
+    """
+    Возвращает системный промпт, используемый для генерации ответов.
+    
+    Returns:
+    {
+        "prompt": "текст системного промпта"
+    }
+    """
+    try:
+        prompt = get_system_prompt()
+        return jsonify({'prompt': prompt}), 200
+    except Exception as e:
+        logger.error(f"Ошибка при получении системного промпта: {e}")
+        return jsonify({'error': f'Ошибка при получении системного промпта: {str(e)}'}), 500
+
+
+@api_bp.route('/estimate-cost', methods=['POST'])
+def estimate_cost():
+    """
+    Оценивает стоимость запроса ДО отправки.
+    
+    Принимает:
+    {
+        "message": "текст сообщения",
+        "model": "openai/gpt-4",
+        "history": [{"role": "user", "content": "..."}, ...],  // опционально
+        "max_tokens": 500,  // опционально
+        "use_system_prompt": true  // опционально, по умолчанию true
+    }
+    
+    Возвращает:
+    {
+        "estimated_cost_rub": 0.15,
+        "estimated_prompt_tokens": 120,
+        "estimated_completion_tokens": 400,
+        "estimated_total_tokens": 520
+    }
+    """
+    try:
+        # Получаем данные из запроса
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'Отсутствуют данные в запросе'}), 400
+        
+        message = data.get('message')
+        model = data.get('model')
+        
+        # Валидация обязательных полей
+        if not message or not isinstance(message, str):
+            return jsonify({'error': 'Поле "message" обязательно и должно быть строкой'}), 400
+        
+        if not model or not isinstance(model, str):
+            return jsonify({'error': 'Поле "model" обязательно и должно быть строкой'}), 400
+        
+        # Получаем опциональные параметры
+        history = data.get('history')
+        max_tokens = data.get('max_tokens')
+        use_system_prompt = data.get('use_system_prompt', True)
+        
+        # Валидация истории (если передана)
+        validated_history = []
+        if history is not None:
+            if not isinstance(history, list):
+                return jsonify({'error': 'history должен быть массивом'}), 400
+            
+            for i, msg in enumerate(history):
+                if not isinstance(msg, dict):
+                    return jsonify({'error': f'Сообщение {i} в history должно быть объектом'}), 400
+                
+                role = msg.get('role')
+                content = msg.get('content')
+                
+                if role not in ['user', 'assistant']:
+                    return jsonify({'error': f'role в сообщении {i} должен быть "user" или "assistant"'}), 400
+                
+                if not isinstance(content, str):
+                    return jsonify({'error': f'content в сообщении {i} должен быть строкой'}), 400
+                
+                validated_history.append({'role': role, 'content': content})
+        
+        # Валидация max_tokens
+        if max_tokens is not None:
+            if max_tokens == 0 or max_tokens == '':
+                max_tokens = None
+            else:
+                try:
+                    max_tokens = int(max_tokens)
+                    if not (1 <= max_tokens <= 4000):
+                        return jsonify({'error': 'max_tokens должен быть от 1 до 4000'}), 400
+                except (ValueError, TypeError):
+                    return jsonify({'error': 'max_tokens должен быть целым числом'}), 400
+        
+        # Получаем системный промпт (если используется)
+        system_prompt = None
+        if use_system_prompt is not False:
+            system_prompt = get_system_prompt()
+        
+        # Оцениваем стоимость
+        estimate = estimate_cost_rub(
+            message=message,
+            model_id=model,
+            history=validated_history if validated_history else None,
+            system_prompt=system_prompt if system_prompt else None,
+            max_tokens=max_tokens
+        )
+        
+        if estimate is None:
+            return jsonify({'error': 'Не удалось оценить стоимость. Проверьте корректность модели.'}), 500
+        
+        return jsonify(estimate), 200
+    
+    except Exception as e:
+        logger.error(f"Ошибка при оценке стоимости: {e}")
+        return jsonify({'error': f'Внутренняя ошибка сервера: {str(e)}'}), 500

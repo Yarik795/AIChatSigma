@@ -1,12 +1,17 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import Message from './Message'
 
 function Chat({ selectedModel, settings }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [costEstimate, setCostEstimate] = useState(null)
+  const [isEstimating, setIsEstimating] = useState(false)
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
+  const abortControllerRef = useRef(null)
+  const readerRef = useRef(null)
+  const estimateTimeoutRef = useRef(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -30,6 +35,119 @@ function Chat({ selectedModel, settings }) {
     autoResizeTextarea()
   }, [input])
 
+  // Функция для получения истории чата в формате для API
+  const getChatHistory = useCallback(() => {
+    return messages
+      .filter(msg => {
+        // Исключаем streaming сообщения
+        if (msg.isStreaming) return false
+        // Исключаем сообщения с ошибками
+        if (msg.isError) return false
+        // Включаем только user и assistant сообщения
+        return msg.role === 'user' || msg.role === 'assistant'
+      })
+      .map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
+  }, [messages])
+
+  // Функция оценки стоимости
+  const estimateCost = useCallback(async (messageText) => {
+    if (!messageText.trim() || isLoading) {
+      setCostEstimate(null)
+      return
+    }
+
+    setIsEstimating(true)
+
+    try {
+      // Получаем историю чата для оценки
+      const history = getChatHistory()
+
+      const requestPayload = {
+        message: messageText,
+        model: selectedModel,
+        history: history.length > 0 ? history : undefined,
+        max_tokens: settings.max_tokens || undefined,
+        use_system_prompt: settings.use_system_prompt !== false
+      }
+
+      const response = await fetch('/api/estimate-cost', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestPayload)
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setCostEstimate(data)
+      } else {
+        // Если ошибка - просто не показываем оценку
+        setCostEstimate(null)
+      }
+    } catch (error) {
+      // При ошибке просто не показываем оценку
+      setCostEstimate(null)
+    } finally {
+      setIsEstimating(false)
+    }
+  }, [isLoading, selectedModel, settings.max_tokens, settings.use_system_prompt, getChatHistory])
+
+  // Debounce для оценки стоимости при вводе текста
+  useEffect(() => {
+    // Очищаем предыдущий таймер
+    if (estimateTimeoutRef.current) {
+      clearTimeout(estimateTimeoutRef.current)
+    }
+
+    // Если поле пустое - очищаем оценку
+    if (!input.trim()) {
+      setCostEstimate(null)
+      return
+    }
+
+    // Читаем настройку из localStorage
+    const showEstimate = localStorage.getItem('showCostEstimate')
+    if (showEstimate === 'false') {
+      setCostEstimate(null)
+      return
+    }
+
+    // Устанавливаем таймер на 500мс для debounce
+    estimateTimeoutRef.current = setTimeout(() => {
+      estimateCost(input)
+    }, 500)
+
+    // Очистка при размонтировании или изменении зависимостей
+    return () => {
+      if (estimateTimeoutRef.current) {
+        clearTimeout(estimateTimeoutRef.current)
+      }
+    }
+  }, [input, estimateCost])
+
+  // Обновляем оценку при изменении модели или настроек
+  useEffect(() => {
+    if (input.trim() && !isLoading) {
+      // Очищаем старую оценку при смене модели
+      setCostEstimate(null)
+      
+      // Читаем настройку из localStorage
+      const showEstimate = localStorage.getItem('showCostEstimate')
+      if (showEstimate !== 'false') {
+        // Пересчитываем с небольшой задержкой
+        const timeoutId = setTimeout(() => {
+          estimateCost(input)
+        }, 300)
+        
+        return () => clearTimeout(timeoutId)
+      }
+    }
+  }, [selectedModel, settings.max_tokens, settings.use_system_prompt, input, isLoading, estimateCost])
+
   const handleStreamingSend = async (userMessage) => {
     // Создаем placeholder сообщение ассистента
     const placeholderMessage = {
@@ -42,14 +160,31 @@ function Chat({ selectedModel, settings }) {
     setMessages(prev => [...prev, placeholderMessage])
     setIsLoading(true)
 
+    // Создаем новый AbortController для этого запроса
+    abortControllerRef.current = new AbortController()
+    readerRef.current = null
+
     try {
+      // Получаем историю чата (исключая текущее сообщение пользователя, которое передается отдельно)
+      const history = getChatHistory()
+      // Убираем последнее сообщение пользователя из истории, так как оно передается как текущее message
+      const historyWithoutLastUser = history.length > 0 && history[history.length - 1].role === 'user'
+        ? history.slice(0, -1)
+        : history
+
       const requestPayload = {
         message: userMessage,
         model: selectedModel,
         temperature: settings.temperature,
         verbosity: settings.verbosity,
         frequency_penalty: settings.frequency_penalty,
-        top_p: settings.top_p
+        top_p: settings.top_p,
+        use_system_prompt: settings.use_system_prompt !== false
+      }
+      
+      // Передаем историю только если она не пустая
+      if (historyWithoutLastUser.length > 0) {
+        requestPayload.history = historyWithoutLastUser
       }
       
       // Передаем max_tokens только если он установлен (не null и > 0)
@@ -65,7 +200,8 @@ function Chat({ selectedModel, settings }) {
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(requestPayload)
+          body: JSON.stringify(requestPayload),
+          signal: abortControllerRef.current.signal
         })
       } catch (fetchError) {
         // Обработка сетевых ошибок (network error, CORS, timeout и т.д.)
@@ -101,6 +237,7 @@ function Chat({ selectedModel, settings }) {
 
       // Получаем ReadableStream
       const reader = response.body.getReader()
+      readerRef.current = reader
       const decoder = new TextDecoder()
       
       let buffer = ''
@@ -115,7 +252,11 @@ function Chat({ selectedModel, settings }) {
           try {
             readResult = await reader.read()
           } catch (readError) {
-            // Ошибка при чтении потока (может быть из-за обрыва соединения)
+            // Ошибка при чтении потока (может быть из-за обрыва соединения или прерывания запроса)
+            if (readError.name === 'AbortError') {
+              // Запрос был прерван пользователем
+              throw readError
+            }
             throw new Error(`Ошибка чтения потока данных: ${readError.message || 'Соединение прервано'}`)
           }
           
@@ -196,10 +337,13 @@ function Chat({ selectedModel, settings }) {
         }
       } finally {
         // Закрываем reader в любом случае
-        try {
-          reader.releaseLock()
-        } catch (e) {
-          // Игнорируем ошибки при закрытии
+        if (readerRef.current) {
+          try {
+            readerRef.current.releaseLock()
+          } catch (e) {
+            // Игнорируем ошибки при закрытии
+          }
+          readerRef.current = null
         }
       }
 
@@ -224,6 +368,29 @@ function Chat({ selectedModel, settings }) {
       })
 
     } catch (error) {
+      // Проверяем, был ли запрос прерван пользователем
+      if (error.name === 'AbortError') {
+        // Запрос был прерван пользователем - обрабатываем как нормальное прерывание
+        setMessages(prev => {
+          const newMessages = [...prev]
+          // Находим последнее сообщение ассистента с флагом isStreaming
+          for (let i = newMessages.length - 1; i >= 0; i--) {
+            if (newMessages[i].role === 'assistant' && newMessages[i].isStreaming) {
+              // Сохраняем накопленный контент, если есть
+              const currentContent = newMessages[i].content || ''
+              newMessages[i] = {
+                ...newMessages[i],
+                content: currentContent || '(Генерация прервана)',
+                isStreaming: undefined
+              }
+              break
+            }
+          }
+          return newMessages
+        })
+        return // Выходим без показа ошибки
+      }
+      
       // Определяем понятное сообщение об ошибке
       let errorMessage = 'Произошла ошибка'
       
@@ -267,7 +434,30 @@ function Chat({ selectedModel, settings }) {
       console.error('Ошибка при отправке сообщения:', error)
     } finally {
       setIsLoading(false)
+      abortControllerRef.current = null
     }
+  }
+
+  const handleStop = () => {
+    // Прерываем запрос через AbortController
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    // Также пытаемся закрыть reader если он есть
+    if (readerRef.current) {
+      try {
+        readerRef.current.cancel()
+        readerRef.current.releaseLock()
+      } catch (e) {
+        // Игнорируем ошибки при закрытии
+      }
+      readerRef.current = null
+    }
+  }
+
+  const handleNewChat = () => {
+    setMessages([])
+    setCostEstimate(null)
   }
 
   const handleSend = async (e) => {
@@ -277,6 +467,7 @@ function Chat({ selectedModel, settings }) {
 
     const userMessage = input.trim()
     setInput('')
+    setCostEstimate(null)  // Очищаем оценку при отправке
     // Сброс высоты textarea после отправки
     setTimeout(() => {
       if (textareaRef.current) {
@@ -294,6 +485,21 @@ function Chat({ selectedModel, settings }) {
 
   return (
     <div className="chat-container">
+      {messages.length > 0 && (
+        <div className="chat-header">
+          <button 
+            className="new-chat-button"
+            onClick={handleNewChat}
+            aria-label="Начать новый чат"
+            title="Начать новый чат"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 3.33333V1.33333M8 14.6667V12.6667M14.6667 8H12.6667M3.33333 8H1.33333M12.6187 3.38133L11.528 4.472M4.472 11.528L3.38133 12.6187M12.6187 12.6187L11.528 11.528M4.472 4.472L3.38133 3.38133M11.3333 8C11.3333 9.84095 9.84095 11.3333 8 11.3333C6.15905 11.3333 4.66667 9.84095 4.66667 8C4.66667 6.15905 6.15905 4.66667 8 4.66667C9.84095 4.66667 11.3333 6.15905 11.3333 8Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span>Новый чат</span>
+          </button>
+        </div>
+      )}
       <div className="messages">
         {messages.length === 0 && (
           <div className="welcome-message">
@@ -304,7 +510,7 @@ function Chat({ selectedModel, settings }) {
         {messages.map((message, index) => (
           <Message key={index} message={message} />
         ))}
-        {isLoading && (
+        {isLoading && !messages.some(msg => msg.role === 'assistant' && msg.isStreaming) && (
           <div className="message assistant loading">
             <div className="message-content">
               <div className="typing-indicator">
@@ -344,16 +550,41 @@ function Chat({ selectedModel, settings }) {
             rows="1"
             disabled={isLoading}
           />
-          <button 
-            type="submit" 
-            className="send-button"
-            disabled={!input.trim() || isLoading}
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M18 2L9 11M18 2L12 18L9 11M18 2L2 8L9 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
+          {isLoading ? (
+            <button 
+              type="button" 
+              className="stop-button"
+              onClick={handleStop}
+              aria-label="Остановить генерацию"
+              title="Остановить генерацию"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <rect x="6" y="6" width="8" height="8" rx="1" fill="currentColor"/>
+              </svg>
+            </button>
+          ) : (
+            <button 
+              type="submit" 
+              className="send-button"
+              disabled={!input.trim() || isLoading}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M18 2L9 11M18 2L12 18L9 11M18 2L2 8L9 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          )}
         </div>
+        {costEstimate && !isLoading && (
+          <div className="cost-estimate">
+            <span className="cost-estimate-icon">💰</span>
+            <span className="cost-estimate-text">
+              ~{costEstimate.estimated_cost_rub.toFixed(2)}₽ за этот запрос
+            </span>
+            {isEstimating && (
+              <span className="cost-estimate-loading">...</span>
+            )}
+          </div>
+        )}
       </form>
     </div>
   )
