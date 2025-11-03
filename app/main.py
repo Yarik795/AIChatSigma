@@ -31,6 +31,19 @@ app = Flask(__name__,
 # Настройка CORS
 CORS(app)
 
+# Отключаем кэширование статики в debug режиме
+if app.debug:
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+    
+    @app.after_request
+    def add_no_cache_headers(response):
+        """Добавляет заголовки no-cache в debug режиме"""
+        if app.debug:
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+        return response
+
 # Регистрация API blueprint
 app.register_blueprint(api_bp, url_prefix='/api')
 
