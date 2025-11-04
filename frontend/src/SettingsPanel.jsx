@@ -7,7 +7,8 @@ const BUSINESS_CORRESPONDENCE_SETTINGS = {
   verbosity: 'medium',
   frequency_penalty: 0.3,
   top_p: 0.9,
-  use_system_prompt: true
+  use_system_prompt: true,
+  use_ia_style: false
 }
 
 // Классические настройки (старые значения по умолчанию)
@@ -17,7 +18,8 @@ const CLASSIC_SETTINGS = {
   verbosity: 'medium',
   frequency_penalty: 0.0,
   top_p: 1.0,
-  use_system_prompt: true
+  use_system_prompt: true,
+  use_ia_style: false
 }
 
 // Используем настройки деловой переписки как значения по умолчанию
@@ -168,7 +170,8 @@ function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }) {
       current.verbosity === preset.verbosity &&
       Math.abs(current.frequency_penalty - preset.frequency_penalty) < 0.01 &&
       Math.abs(current.top_p - preset.top_p) < 0.01 &&
-      current.use_system_prompt === preset.use_system_prompt
+      current.use_system_prompt === preset.use_system_prompt &&
+      current.use_ia_style === preset.use_ia_style
     )
   }
 
@@ -427,6 +430,19 @@ function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }) {
                   id="use-system-prompt"
                   checked={localSettings.use_system_prompt !== false}
                   onChange={(e) => handleChange('use_system_prompt', e.target.checked)}
+                />
+              </div>
+            </div>
+            <div className="setting-item">
+              <div className="setting-label">
+                <label htmlFor="use-ia-style">Стиль И.А.</label>
+              </div>
+              <div className="setting-control">
+                <input
+                  type="checkbox"
+                  id="use-ia-style"
+                  checked={localSettings.use_ia_style === true}
+                  onChange={(e) => handleChange('use_ia_style', e.target.checked)}
                 />
               </div>
             </div>

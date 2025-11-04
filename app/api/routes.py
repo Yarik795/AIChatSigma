@@ -8,7 +8,7 @@ import time
 import requests
 from flask import Blueprint, request, jsonify, Response, stream_with_context
 from app.api.cost_calculator import calculate_cost_rub, estimate_cost_rub
-from app.config.prompt_loader import get_system_prompt
+from app.config.prompt_loader import get_system_prompt, get_combined_system_prompt
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -62,6 +62,7 @@ def chat():
         top_p = data.get('top_p')
         history = data.get('history')
         use_system_prompt = data.get('use_system_prompt', True)
+        use_ia_style = data.get('use_ia_style', False)
         
         # Валидация параметров (если переданы)
         if temperature is not None:
@@ -152,7 +153,7 @@ def chat():
         messages = []
         # Добавляем системный промпт только если он включен в настройках
         if use_system_prompt is not False:
-            system_prompt = get_system_prompt()
+            system_prompt = get_combined_system_prompt(use_ia_style=use_ia_style)
             if system_prompt:
                 messages.append({'role': 'system', 'content': system_prompt})
         
@@ -298,6 +299,7 @@ def _validate_chat_params(data):
     top_p = data.get('top_p')
     history = data.get('history')
     use_system_prompt = data.get('use_system_prompt', True)
+    use_ia_style = data.get('use_ia_style', False)
     
     # Валидация параметров (если переданы)
     if temperature is not None:
@@ -372,7 +374,7 @@ def _validate_chat_params(data):
     messages = []
     # Добавляем системный промпт только если он включен в настройках
     if use_system_prompt is not False:
-        system_prompt = get_system_prompt()
+        system_prompt = get_combined_system_prompt(use_ia_style=use_ia_style)
         if system_prompt:
             messages.append({'role': 'system', 'content': system_prompt})
     
@@ -712,6 +714,7 @@ def estimate_cost():
         history = data.get('history')
         max_tokens = data.get('max_tokens')
         use_system_prompt = data.get('use_system_prompt', True)
+        use_ia_style = data.get('use_ia_style', False)
         
         # Валидация истории (если передана)
         validated_history = []
@@ -749,7 +752,7 @@ def estimate_cost():
         # Получаем системный промпт (если используется)
         system_prompt = None
         if use_system_prompt is not False:
-            system_prompt = get_system_prompt()
+            system_prompt = get_combined_system_prompt(use_ia_style=use_ia_style)
         
         # Оцениваем стоимость
         estimate = estimate_cost_rub(

@@ -70,7 +70,8 @@ function Chat({ selectedModel, settings }) {
         model: selectedModel,
         history: history.length > 0 ? history : undefined,
         max_tokens: settings.max_tokens || undefined,
-        use_system_prompt: settings.use_system_prompt !== false
+        use_system_prompt: settings.use_system_prompt !== false,
+        use_ia_style: settings.use_ia_style === true
       }
 
       const response = await fetch('/api/estimate-cost', {
@@ -94,7 +95,7 @@ function Chat({ selectedModel, settings }) {
     } finally {
       setIsEstimating(false)
     }
-  }, [isLoading, selectedModel, settings.max_tokens, settings.use_system_prompt, getChatHistory])
+  }, [isLoading, selectedModel, settings.max_tokens, settings.use_system_prompt, settings.use_ia_style, getChatHistory])
 
   // Debounce для оценки стоимости при вводе текста
   useEffect(() => {
@@ -179,7 +180,8 @@ function Chat({ selectedModel, settings }) {
         verbosity: settings.verbosity,
         frequency_penalty: settings.frequency_penalty,
         top_p: settings.top_p,
-        use_system_prompt: settings.use_system_prompt !== false
+        use_system_prompt: settings.use_system_prompt !== false,
+        use_ia_style: settings.use_ia_style === true
       }
       
       // Передаем историю только если она не пустая

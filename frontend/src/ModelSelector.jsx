@@ -33,6 +33,12 @@ const MODELS = [
     icon: '🧠',
     logo: '/images/models/qwen.svg'
   },
+  { 
+    value: 'minimax/minimax-m2:free', 
+    label: 'Minimax M2 Free', 
+    icon: '🎯',
+    logo: '/images/models/minimax.svg'
+  },
 ]
 
 function ModelSelector({ selectedModel, onModelChange }) {
