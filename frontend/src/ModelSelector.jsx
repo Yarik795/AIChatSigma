@@ -34,10 +34,10 @@ const MODELS = [
     logo: '/images/models/qwen.svg'
   },
   { 
-    value: 'minimax/minimax-m2:free', 
-    label: 'Minimax M2 Free', 
-    icon: '🎯',
-    logo: '/images/models/minimax.svg'
+    value: 'google/gemini-3-pro-preview', 
+    label: 'Gemini 3 Pro Preview', 
+    icon: '💎',
+    logo: '/images/models/gemini.svg'
   },
 ]
 

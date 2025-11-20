@@ -4,7 +4,7 @@ import ModelSelector from './ModelSelector'
 import SettingsPanel, { DEFAULT_SETTINGS } from './SettingsPanel'
 
 function App() {
-  const [selectedModel, setSelectedModel] = useState('google/gemini-2.5-pro')
+  const [selectedModel, setSelectedModel] = useState('google/gemini-3-pro-preview')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   const [theme, setTheme] = useState(() => {
