@@ -5,39 +5,37 @@ const MODELS = [
     value: 'google/gemini-2.5-pro', 
     label: 'Gemini 2.5 Pro', 
     icon: '💎',
-    logo: '/images/models/gemini.svg'
+    logo: '/images/models/GoogleGemini.svg'
   },
   { 
     value: 'anthropic/claude-sonnet-4.5', 
     label: 'Claude Sonnet 4.5', 
     icon: '🤖',
-    // Используйте локальный файл или внешний URL
-    // Пример внешнего URL: 'https://cdn.jsdelivr.net/gh/simple-icons/simple-icons@v9/icons/anthropic.svg'
-    logo: '/images/models/claude.svg'
+    logo: '/images/models/Anthropic.svg'
   },
   { 
     value: 'x-ai/grok-4-fast', 
     label: 'Grok 4 Fast', 
     icon: '⚡',
-    logo: '/images/models/grok.svg'
+    logo: '/images/models/Grok.png'
   },
   { 
     value: 'deepseek/deepseek-chat-v3-0324', 
     label: 'DeepSeek Chat v3', 
     icon: '🔍',
-    logo: '/images/models/deepseek.svg'
+    logo: '/images/models/DeepSeek.png'
   },
   { 
     value: 'qwen/qwen3-235b-a22b-2507', 
     label: 'Qwen3 235B', 
     icon: '🧠',
-    logo: '/images/models/qwen.svg'
+    logo: '/images/models/Qwen.png'
   },
   { 
     value: 'google/gemini-3-pro-preview', 
     label: 'Gemini 3 Pro Preview', 
     icon: '💎',
-    logo: '/images/models/gemini.svg'
+    logo: '/images/models/GoogleGemini.svg'
   },
 ]
 
