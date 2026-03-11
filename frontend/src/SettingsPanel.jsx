@@ -3,13 +3,14 @@ import { X } from 'lucide-react'
 
 // Предустановка для деловой переписки (новые значения по умолчанию)
 const BUSINESS_CORRESPONDENCE_SETTINGS = {
-  temperature: 0.3,
-  max_tokens: null,
+  temperature: 0.2,
+  max_tokens: 2000,
   verbosity: 'medium',
   frequency_penalty: 0.3,
-  top_p: 0.9,
+  presence_penalty: 0.0,
+  top_p: 0.75,
   use_system_prompt: true,
-  use_ia_style: false
+  use_ia_style: true
 }
 
 // Классические настройки (старые значения по умолчанию)
@@ -18,6 +19,7 @@ const CLASSIC_SETTINGS = {
   max_tokens: null,
   verbosity: 'medium',
   frequency_penalty: 0.0,
+  presence_penalty: 0.0,
   top_p: 1.0,
   use_system_prompt: true,
   use_ia_style: false
@@ -37,6 +39,7 @@ const PARAMETER_HINTS = {
   max_tokens: "Максимальное количество токенов в ответе. Оставьте пустым для безлимитной генерации. Больше токенов = длиннее ответ (выше стоимость)",
   verbosity: "Детальность ответа. Low = кратко, Medium = сбалансированно, High = подробно",
   frequency_penalty: "Штраф за повторение слов. Положительные значения уменьшают повторения, отрицательные - увеличивают",
+  presence_penalty: "Штраф за обращение к уже упомянутым темам. Для деловой переписки рекомендуется 0 – документы часто ссылаются на ранее изложенное",
   top_p: "Ограничивает выбор токенов. Низкие значения = более предсказуемые ответы, 1.0 = полный выбор"
 }
 
@@ -170,6 +173,7 @@ function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }) {
       current.max_tokens === preset.max_tokens &&
       current.verbosity === preset.verbosity &&
       Math.abs(current.frequency_penalty - preset.frequency_penalty) < 0.01 &&
+      Math.abs((current.presence_penalty ?? 0) - (preset.presence_penalty ?? 0)) < 0.01 &&
       Math.abs(current.top_p - preset.top_p) < 0.01 &&
       current.use_system_prompt === preset.use_system_prompt &&
       current.use_ia_style === preset.use_ia_style
@@ -332,6 +336,38 @@ function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }) {
                   onChange={(e) => handleChange('frequency_penalty', parseFloat(e.target.value))}
                 />
                 <span className="setting-value">{localSettings.frequency_penalty.toFixed(1)}</span>
+              </div>
+            </div>
+
+            {/* Presence Penalty */}
+            <div className="setting-item">
+              <div className="setting-label">
+                <label htmlFor="presence_penalty">Штраф за повторения тем (Presence Penalty)</label>
+                <div className="tooltip-container">
+                  <button
+                    className="tooltip-icon"
+                    onMouseEnter={() => setTooltipKey('presence_penalty')}
+                    onMouseLeave={() => setTooltipKey(null)}
+                    aria-label="Подсказка"
+                  >
+                    ?
+                  </button>
+                  {tooltipKey === 'presence_penalty' && (
+                    <div className="tooltip">{PARAMETER_HINTS.presence_penalty}</div>
+                  )}
+                </div>
+              </div>
+              <div className="setting-control">
+                <input
+                  type="range"
+                  id="presence_penalty"
+                  min="-2"
+                  max="2"
+                  step="0.1"
+                  value={localSettings.presence_penalty ?? 0}
+                  onChange={(e) => handleChange('presence_penalty', parseFloat(e.target.value))}
+                />
+                <span className="setting-value">{(localSettings.presence_penalty ?? 0).toFixed(1)}</span>
               </div>
             </div>
 

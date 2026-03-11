@@ -486,6 +486,7 @@ git stash save "wip: рабочее состояние на вечер"
 ## 📚 Дополнительные ресурсы
 
 - [README.md](../README.md) - основная документация
+- [DEV_AUTOMATION.md](DEV_AUTOMATION.md) - скрипты автоматизации (dev-start, dev-deploy, quick-push, Git hooks)
 - [DEPLOY_CHECKLIST.md](../DEPLOY_CHECKLIST.md) - чеклист деплоя
 - [AMVERA_DEPLOY.md](../AMVERA_DEPLOY.md) - детальная инструкция по Amvera
 - [.cursorrules](../.cursorrules) - правила работы с Cursor AI

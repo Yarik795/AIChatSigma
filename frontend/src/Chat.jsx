@@ -180,6 +180,7 @@ function Chat({ selectedModel, settings }) {
         temperature: settings.temperature,
         verbosity: settings.verbosity,
         frequency_penalty: settings.frequency_penalty,
+        presence_penalty: settings.presence_penalty ?? 0,
         top_p: settings.top_p,
         use_system_prompt: settings.use_system_prompt !== false,
         use_ia_style: settings.use_ia_style === true

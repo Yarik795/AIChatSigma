@@ -1,0 +1,25 @@
+#!/bin/sh
+# pre-commit hook — проверки перед коммитом
+# Копируется в .git/hooks/pre-commit через setup-hooks.ps1
+
+# Проверка: .env не должен попадать в коммит
+if git diff --cached --name-only | grep -q '^\.env$'; then
+    echo ""
+    echo "ОШИБКА: .env не должен попадать в коммит!"
+    echo "Файл .env содержит секреты и должен быть в .gitignore."
+    echo ""
+    exit 1
+fi
+
+# Проверка синтаксиса Python (если есть изменения в app/*.py)
+if git diff --cached --name-only | grep -q '^app/.*\.py$'; then
+    echo "Проверка синтаксиса Python..."
+    for f in $(git diff --cached --name-only | grep '^app/.*\.py$'); do
+        if ! python -m py_compile "$f" 2>/dev/null; then
+            echo "ОШИБКА: синтаксическая ошибка в $f"
+            exit 1
+        fi
+    done
+fi
+
+exit 0

@@ -59,6 +59,7 @@ def chat():
         max_tokens = data.get('max_tokens')
         verbosity = data.get('verbosity')
         frequency_penalty = data.get('frequency_penalty')
+        presence_penalty = data.get('presence_penalty')
         top_p = data.get('top_p')
         history = data.get('history')
         use_system_prompt = data.get('use_system_prompt', True)
@@ -96,6 +97,14 @@ def chat():
                     return jsonify({'error': 'frequency_penalty должен быть от -2.0 до 2.0'}), 400
             except (ValueError, TypeError):
                 return jsonify({'error': 'frequency_penalty должен быть числом'}), 400
+        
+        if presence_penalty is not None:
+            try:
+                presence_penalty = float(presence_penalty)
+                if not (-2.0 <= presence_penalty <= 2.0):
+                    return jsonify({'error': 'presence_penalty должен быть от -2.0 до 2.0'}), 400
+            except (ValueError, TypeError):
+                return jsonify({'error': 'presence_penalty должен быть числом'}), 400
         
         if top_p is not None:
             try:
@@ -177,6 +186,9 @@ def chat():
         
         if frequency_penalty is not None:
             payload['frequency_penalty'] = frequency_penalty
+        
+        if presence_penalty is not None:
+            payload['presence_penalty'] = presence_penalty
         
         if top_p is not None:
             payload['top_p'] = top_p
@@ -293,6 +305,7 @@ def _validate_chat_params(data):
     max_tokens = data.get('max_tokens')
     verbosity = data.get('verbosity')
     frequency_penalty = data.get('frequency_penalty')
+    presence_penalty = data.get('presence_penalty')
     top_p = data.get('top_p')
     history = data.get('history')
     use_system_prompt = data.get('use_system_prompt', True)
@@ -329,6 +342,14 @@ def _validate_chat_params(data):
                 return None, None, None, (jsonify({'error': 'frequency_penalty должен быть от -2.0 до 2.0'}), 400)
         except (ValueError, TypeError):
             return None, None, None, (jsonify({'error': 'frequency_penalty должен быть числом'}), 400)
+    
+    if presence_penalty is not None:
+        try:
+            presence_penalty = float(presence_penalty)
+            if not (-2.0 <= presence_penalty <= 2.0):
+                return None, None, None, (jsonify({'error': 'presence_penalty должен быть от -2.0 до 2.0'}), 400)
+        except (ValueError, TypeError):
+            return None, None, None, (jsonify({'error': 'presence_penalty должен быть числом'}), 400)
     
     if top_p is not None:
         try:
@@ -397,6 +418,9 @@ def _validate_chat_params(data):
     
     if frequency_penalty is not None:
         payload['frequency_penalty'] = frequency_penalty
+    
+    if presence_penalty is not None:
+        payload['presence_penalty'] = presence_penalty
     
     if top_p is not None:
         payload['top_p'] = top_p

@@ -1,0 +1,33 @@
+#!/bin/sh
+# pre-push hook — проверка перед push
+# Предупреждает, если frontend/src изменён, но app/static не пересобран
+
+# Получаем список файлов, которые будут запушены
+FRONT_CHANGES=$(git diff origin/main...HEAD --name-only 2>/dev/null | grep '^frontend/src/')
+if [ -z "$FRONT_CHANGES" ]; then
+    FRONT_CHANGES=$(git diff origin/master...HEAD --name-only 2>/dev/null | grep '^frontend/src/')
+fi
+
+STATIC_CHANGES=$(git diff origin/main...HEAD --name-only 2>/dev/null | grep '^app/static/')
+if [ -z "$STATIC_CHANGES" ]; then
+    STATIC_CHANGES=$(git diff origin/master...HEAD --name-only 2>/dev/null | grep '^app/static/')
+fi
+
+if [ -n "$FRONT_CHANGES" ] && [ -z "$STATIC_CHANGES" ]; then
+    echo ""
+    echo "ПРЕДУПРЕЖДЕНИЕ: frontend/src/ изменён, но app/static/ не пересобран!"
+    echo ""
+    echo "Изменённые файлы фронтенда:"
+    echo "$FRONT_CHANGES"
+    echo ""
+    echo "Рекомендуется: cd frontend && npm run build && git add app/static/ && git commit --amend --no-edit"
+    echo ""
+    printf "Продолжить push без пересборки? [y/N] "
+    read answer
+    if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
+        echo "Push отменён."
+        exit 1
+    fi
+fi
+
+exit 0

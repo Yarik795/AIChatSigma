@@ -116,6 +116,17 @@ export FLASK_ENV=development
 flask run
 ```
 
+### Скрипты автоматизации (Windows PowerShell)
+
+Для ускорения разработки доступны скрипты в `scripts/`:
+
+- `.\scripts\dev-start.ps1` — запуск backend и frontend одной командой
+- `.\scripts\dev-check.ps1` — анализ: что требует пересборки/перезапуска
+- `.\scripts\dev-deploy.ps1` — интерактивный пайплайн деплоя
+- `.\scripts\quick-push.ps1 -m "сообщение"` — быстрый коммит и push
+
+Подробнее: [docs/DEV_AUTOMATION.md](docs/DEV_AUTOMATION.md)
+
 ## Деплой на Amvera
 
 ### Предварительные требования
