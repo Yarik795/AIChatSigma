@@ -2,40 +2,34 @@ import { useState } from 'react'
 
 const MODELS = [
   { 
-    value: 'google/gemini-2.5-pro', 
-    label: 'Gemini 2.5 Pro', 
+    value: 'google/gemini-3.1-pro-preview', 
+    label: 'Gemini 3.1 Pro', 
     icon: '💎',
     logo: '/images/models/GoogleGemini.svg'
   },
   { 
-    value: 'anthropic/claude-sonnet-4.5', 
-    label: 'Claude Sonnet 4.5', 
+    value: 'anthropic/claude-sonnet-4.6', 
+    label: 'Claude Sonnet 4.6', 
     icon: '🤖',
     logo: '/images/models/Anthropic.svg'
   },
   { 
-    value: 'x-ai/grok-4-fast', 
-    label: 'Grok 4 Fast', 
-    icon: '⚡',
-    logo: '/images/models/Grok.png'
-  },
-  { 
-    value: 'deepseek/deepseek-chat-v3-0324', 
-    label: 'DeepSeek Chat v3', 
-    icon: '🔍',
-    logo: '/images/models/DeepSeek.png'
-  },
-  { 
-    value: 'qwen/qwen3-235b-a22b-2507', 
-    label: 'Qwen3 235B', 
+    value: 'openai/gpt-5.4', 
+    label: 'GPT-5.4', 
     icon: '🧠',
-    logo: '/images/models/Qwen.png'
+    logo: '/images/models/OpenAI.svg'
   },
   { 
-    value: 'google/gemini-3-pro-preview', 
-    label: 'Gemini 3 Pro Preview', 
-    icon: '💎',
-    logo: '/images/models/GoogleGemini.svg'
+    value: 'deepseek/deepseek-v3.2-speciale', 
+    label: 'DeepSeek V3.2 Speciale', 
+    icon: '🔍',
+    logo: '/images/models/deepseek.svg'
+  },
+  { 
+    value: 'x-ai/grok-4.1-fast', 
+    label: 'Grok 4.1 Fast', 
+    icon: '⚡',
+    logo: '/images/models/grok.svg'
   },
 ]
 

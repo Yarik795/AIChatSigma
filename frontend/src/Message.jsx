@@ -48,12 +48,15 @@ function Message({ message }) {
               aria-label="Копировать сообщение"
             >
               {copied ? (
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M13.5 4L6 11.5L2.5 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               ) : (
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M5.5 4.5H3.5C2.94772 4.5 2.5 4.94772 2.5 5.5V12.5C2.5 13.0523 2.94772 13.5 3.5 13.5H10.5C11.0523 13.5 11.5 13.0523 11.5 12.5V10.5M9.5 2.5H13.5C14.0523 2.5 14.5 2.94772 14.5 3.5V7.5M9.5 2.5H6.5C5.94772 2.5 5.5 2.94772 5.5 3.5V7.5M9.5 2.5L14.5 7.5M14.5 7.5H11.5M14.5 7.5V4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  {/* Задний лист (оригинал) */}
+                  <rect x="3" y="9" width="9" height="12" rx="1" stroke="currentColor" strokeWidth="2"/>
+                  {/* Передний лист (копия), накладывается на задний */}
+                  <rect x="10" y="3" width="9" height="12" rx="1" stroke="currentColor" strokeWidth="2"/>
                 </svg>
               )}
             </button>
