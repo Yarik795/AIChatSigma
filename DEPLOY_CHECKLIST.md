@@ -24,7 +24,7 @@
 
 ## Шаги деплоя
 
-### 1. Убедитесь, что frontend собран
+### 1. Соберите frontend (ОБЯЗАТЕЛЬНО перед каждым деплоем)
 
 ```bash
 cd frontend
@@ -32,28 +32,41 @@ npm install
 npm run build
 ```
 
-Файлы должны появиться в `app/static/`
+Файлы должны появиться в `app/static/` (index.html, assets/*.js, assets/*.css, images/models/*)
 
-### 2. Закоммитьте изменения
+### 2. Проверьте, что app/static закоммичен
+
+**Критично:** Amvera разворачивает код из Git. Если `app/static/` не закоммичен — пользователи увидят старую версию (старый список моделей, старый UI).
 
 ```bash
-git add .
-git commit -m "Prepare for Amvera deployment"
+git status app/static
+```
+
+Должны быть закоммичены: `index.html`, `assets/index-*.js`, `assets/index-*.css`, `images/models/*.svg`
+
+### 3. Закоммитьте и отправьте изменения
+
+```bash
+git add app/static/
+git add frontend/src/   # если меняли исходники
+git add app/           # если меняли backend
+git status            # проверьте что всё нужное в stage
+git commit -m "build: обновление моделей и статики"
 git push origin main
 ```
 
-### 3. Создайте проект на Amvera
+### 4. Создайте проект на Amvera
 
 1. Войдите в [панель Amvera](https://console.amvera.ru)
 2. Нажмите **"Создать проект"**
 3. Выберите **"Из Git-репозитория"**
 4. Подключите ваш репозиторий
 
-### 4. Настройте переменные окружения
+### 5. Настройте переменные окружения
 
 В настройках проекта добавьте переменные (см. выше)
 
-### 5. Настройте вебхук (опционально)
+### 6. Настройте вебхук (опционально)
 
 Для автоматического деплоя при каждом push:
 
@@ -62,7 +75,7 @@ git push origin main
 3. В GitHub: **Settings → Webhooks → Add webhook**
 4. Вставьте URL, выберите `Just the push event`
 
-### 6. Проверьте деплой
+### 7. Проверьте деплой
 
 После push или ручного деплоя проверьте:
 
@@ -76,6 +89,13 @@ git push origin main
 
 - Проверьте переменную `OPENROUTER_API_KEY` в настройках Amvera
 - Убедитесь, что имя переменной написано правильно
+
+### Список моделей не обновился после деплоя
+
+- **Причина:** `app/static/` не был закоммичен или собран до push
+- **Решение:** Выполните `npm run build` в `frontend/`, затем `git add app/static/` и закоммитьте
+- **Кэш браузера:** Сделайте жёсткое обновление (Ctrl+Shift+R или Cmd+Shift+R)
+- **Проверка:** `git status app/static` — не должно быть untracked или modified файлов после push
 
 ### Frontend не отображается
 

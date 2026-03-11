@@ -4,15 +4,21 @@ Flask приложение для проксирования запросов к
 Последнее обновление: 2025-11-01
 """
 import os
+import sys
+
+# Добавляем корень проекта в sys.path для корректных импортов (app.api, app.config)
+# при запуске из любой директории: app/, корень проекта и т.д.
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 from flask import Flask, send_from_directory, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 from app.api.routes import api_bp
 
 # Загружаем переменные окружения из .env файла (для локальной разработки)
-# Определяем корень проекта (на уровень выше папки app)
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-env_path = os.path.join(project_root, '.env')
+env_path = os.path.join(_project_root, '.env')
 
 # Загружаем с явным указанием override=True, чтобы переменные загрузились
 if os.path.exists(env_path):
@@ -48,6 +54,17 @@ if app.debug:
 app.register_blueprint(api_bp, url_prefix='/api')
 
 
+def _add_no_cache_headers(response, path=''):
+    """Добавляет заголовки no-cache для index.html и entry-point assets (JS/CSS)"""
+    if not path or path == 'index.html' or path.endswith('.html'):
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    elif path.startswith('assets/') and (path.endswith('.js') or path.endswith('.css')):
+        response.headers['Cache-Control'] = 'no-cache, must-revalidate, max-age=0'
+    return response
+
+
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_spa(path):
@@ -60,17 +77,20 @@ def serve_spa(path):
         static_path = os.path.join(app.static_folder, path)
         if os.path.exists(static_path) and os.path.isfile(static_path):
             try:
-                return send_from_directory(app.static_folder, path)
+                response = send_from_directory(app.static_folder, path)
+                return _add_no_cache_headers(response, path)
             except Exception:
                 pass
     
     # Проверяем есть ли собранный index.html в static
     static_index = os.path.join(app.static_folder, 'index.html')
     if os.path.exists(static_index):
-        return send_from_directory(app.static_folder, 'index.html')
+        response = send_from_directory(app.static_folder, 'index.html')
+        return _add_no_cache_headers(response, 'index.html')
     
     # Иначе отдаем шаблон index.html для SPA
-    return send_from_directory(app.template_folder, 'index.html')
+    response = send_from_directory(app.template_folder, 'index.html')
+    return _add_no_cache_headers(response, 'index.html')
 
 
 if __name__ == '__main__':
