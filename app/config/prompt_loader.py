@@ -110,30 +110,44 @@ def get_additional_ia_prompt() -> str:
     return _cached_additional_prompt
 
 
-def get_combined_system_prompt(use_ia_style: bool = False) -> str:
+_VERBOSITY_INSTRUCTIONS = {
+    'low': (
+        'УРОВЕНЬ ДЕТАЛЬНОСТИ: краткий.\n'
+        'Максимальная лаконичность. Только суть, без вводных и развёрнутых обоснований.'
+    ),
+    'medium': (
+        'УРОВЕНЬ ДЕТАЛЬНОСТИ: средний.\n'
+        'Стандартный объём: контекст, основная часть, заключение.'
+    ),
+    'high': (
+        'УРОВЕНЬ ДЕТАЛЬНОСТИ: развёрнутый.\n'
+        'Полное раскрытие всех тезисов с подробными обоснованиями.'
+    ),
+}
+
+
+def get_combined_system_prompt(use_ia_style: bool = False, verbosity: str = None) -> str:
     """
-    Возвращает объединенный системный промпт с учетом настройки 'Стиль И.А.'.
+    Возвращает объединенный системный промпт с учетом настроек.
     
     Args:
         use_ia_style: Если True, добавляет дополнительный промпт после основного
+        verbosity: Уровень детальности ('low', 'medium', 'high' или None)
     
     Returns:
-        str: Объединенный системный промпт или только основной, если use_ia_style=False
+        str: Объединенный системный промпт
     """
-    main_prompt = get_system_prompt()
+    parts = [get_system_prompt()]
     
-    if not use_ia_style:
-        return main_prompt
+    if use_ia_style:
+        additional_prompt = get_additional_ia_prompt()
+        if additional_prompt:
+            parts.append(additional_prompt)
     
-    additional_prompt = get_additional_ia_prompt()
+    if verbosity and verbosity in _VERBOSITY_INSTRUCTIONS:
+        parts.append(_VERBOSITY_INSTRUCTIONS[verbosity])
     
-    if not additional_prompt:
-        # Если дополнительный промпт пуст, возвращаем только основной
-        return main_prompt
-    
-    # Объединяем промпты через два переноса строки
-    combined = f"{main_prompt}\n\n{additional_prompt}"
-    return combined
+    return '\n\n'.join(p for p in parts if p)
 
 
 def clear_cache():

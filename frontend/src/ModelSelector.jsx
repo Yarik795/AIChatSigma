@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 
 const MODELS = [
   { 
@@ -83,7 +84,7 @@ function ModelSelector({ selectedModel, onModelChange }) {
       >
         {renderModelIcon(selectedModelData, true)}
         <span>{selectedLabel}</span>
-        <span className="arrow">{isOpen ? '▲' : '▼'}</span>
+        <ChevronDown size={16} className={`arrow ${isOpen ? 'arrow-up' : ''}`} strokeWidth={2} />
       </button>
       {isOpen && (
         <div className="model-dropdown">

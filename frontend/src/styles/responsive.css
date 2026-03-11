@@ -1,0 +1,35 @@
+/**
+ * Адаптивные стили для мобильных устройств
+ */
+
+@media (max-width: 768px) {
+  .header {
+    padding: 0.75rem 1rem;
+  }
+
+  .header-title {
+    font-size: 1rem;
+  }
+
+  .messages {
+    padding: 1rem;
+  }
+
+  .input-form {
+    padding: 0.75rem 1rem;
+  }
+
+  .model-dropdown {
+    right: 0;
+    left: auto;
+    min-width: 180px;
+  }
+
+  .copy-button {
+    opacity: 1;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+  }
+}

@@ -153,7 +153,7 @@ def chat():
         messages = []
         # Добавляем системный промпт только если он включен в настройках
         if use_system_prompt is not False:
-            system_prompt = get_combined_system_prompt(use_ia_style=use_ia_style)
+            system_prompt = get_combined_system_prompt(use_ia_style=use_ia_style, verbosity=verbosity)
             if system_prompt:
                 messages.append({'role': 'system', 'content': system_prompt})
         
@@ -174,9 +174,6 @@ def chat():
         
         if max_tokens is not None:
             payload['max_tokens'] = max_tokens
-        
-        if verbosity is not None:
-            payload['verbosity'] = verbosity
         
         if frequency_penalty is not None:
             payload['frequency_penalty'] = frequency_penalty
@@ -374,7 +371,7 @@ def _validate_chat_params(data):
     messages = []
     # Добавляем системный промпт только если он включен в настройках
     if use_system_prompt is not False:
-        system_prompt = get_combined_system_prompt(use_ia_style=use_ia_style)
+        system_prompt = get_combined_system_prompt(use_ia_style=use_ia_style, verbosity=verbosity)
         if system_prompt:
             messages.append({'role': 'system', 'content': system_prompt})
     
@@ -397,9 +394,6 @@ def _validate_chat_params(data):
     
     if max_tokens is not None:
         payload['max_tokens'] = max_tokens
-    
-    if verbosity is not None:
-        payload['verbosity'] = verbosity
     
     if frequency_penalty is not None:
         payload['frequency_penalty'] = frequency_penalty

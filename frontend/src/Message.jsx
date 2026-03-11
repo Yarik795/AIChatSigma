@@ -1,11 +1,16 @@
 import { useState } from 'react'
+import { Copy, Check, User, Bot, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
-function Message({ message }) {
+function Message({ message, isLastAssistant, onRetry }) {
   const isUser = message.role === 'user'
   const isError = message.isError
   const [copied, setCopied] = useState(false)
+  const [feedback, setFeedback] = useState(null) // 'up' | 'down' | null
 
   const handleCopy = async () => {
     try {
@@ -33,10 +38,43 @@ function Message({ message }) {
 
   const isStreamingEmpty = message.isStreaming && !message.content
 
+  /** Стиль подсветки кода в зависимости от темы */
+  const codeStyle = typeof document !== 'undefined' && document.body?.getAttribute('data-theme') === 'light'
+    ? oneLight
+    : oneDark
+
+  /** Кастомный рендер кода для ReactMarkdown */
+  const markdownComponents = {
+    code({ node, inline, className, children, ...props }) {
+      const match = /language-(\w+)/.exec(className || '')
+      const language = match ? match[1] : 'text'
+      return !inline ? (
+        <SyntaxHighlighter
+          style={codeStyle}
+          language={language}
+          PreTag="div"
+          customStyle={{
+            margin: '0.75em 0',
+            borderRadius: '0.5rem',
+            fontSize: '0.875em',
+            fontFamily: "'JetBrains Mono', 'Fira Code', monospace"
+          }}
+          codeTagProps={{ style: { fontFamily: 'inherit' } }}
+        >
+          {String(children).replace(/\n$/, '')}
+        </SyntaxHighlighter>
+      ) : (
+        <code className={className} {...props}>
+          {children}
+        </code>
+      )
+    }
+  }
+
   return (
     <div className={`message ${message.role} ${isError ? 'error' : ''} ${isStreamingEmpty ? 'loading' : ''}`}>
       <div className="message-avatar">
-        {isUser ? '👤' : '🤖'}
+        {isUser ? <User size={18} strokeWidth={1.75} /> : <Bot size={18} strokeWidth={1.75} />}
       </div>
       <div className="message-content">
         <div className="message-text">
@@ -48,16 +86,9 @@ function Message({ message }) {
               aria-label="Копировать сообщение"
             >
               {copied ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                  <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                <Check size={16} strokeWidth={2.5} aria-hidden="true" />
               ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                  {/* Задний лист (оригинал) */}
-                  <rect x="3" y="9" width="9" height="12" rx="1" stroke="currentColor" strokeWidth="2"/>
-                  {/* Передний лист (копия), накладывается на задний */}
-                  <rect x="10" y="3" width="9" height="12" rx="1" stroke="currentColor" strokeWidth="2"/>
-                </svg>
+                <Copy size={16} strokeWidth={1.75} aria-hidden="true" />
               )}
             </button>
           )}
@@ -68,7 +99,7 @@ function Message({ message }) {
               <span></span>
             </div>
           ) : message.content ? (
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
               {message.content}
             </ReactMarkdown>
           ) : (
@@ -92,6 +123,40 @@ function Message({ message }) {
             {message.model}
             {message.cost && (
               <span className="message-cost"> • {message.cost.total_cost_rub.toFixed(2)} руб.</span>
+            )}
+          </div>
+        )}
+        {/* Feedback: thumbs up/down и retry для ответов ассистента */}
+        {!isUser && !message.isStreaming && !isError && (
+          <div className="message-feedback">
+            <button
+              type="button"
+              className={`feedback-btn ${feedback === 'up' ? 'active' : ''}`}
+              onClick={() => setFeedback(feedback === 'up' ? null : 'up')}
+              aria-label="Хороший ответ"
+              title="Хороший ответ"
+            >
+              <ThumbsUp size={14} strokeWidth={1.75} />
+            </button>
+            <button
+              type="button"
+              className={`feedback-btn ${feedback === 'down' ? 'active' : ''}`}
+              onClick={() => setFeedback(feedback === 'down' ? null : 'down')}
+              aria-label="Плохой ответ"
+              title="Плохой ответ"
+            >
+              <ThumbsDown size={14} strokeWidth={1.75} />
+            </button>
+            {isLastAssistant && onRetry && (
+              <button
+                type="button"
+                className="feedback-btn"
+                onClick={onRetry}
+                aria-label="Перегенерировать ответ"
+                title="Перегенерировать ответ"
+              >
+                <RotateCcw size={14} strokeWidth={1.75} />
+              </button>
             )}
           </div>
         )}

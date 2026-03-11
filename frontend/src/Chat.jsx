@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { Plus, Send, Square } from 'lucide-react'
 import Message from './Message'
 
 function Chat({ selectedModel, settings }) {
@@ -462,6 +463,18 @@ function Chat({ selectedModel, settings }) {
     setCostEstimate(null)
   }
 
+  /** Перегенерировать последний ответ ассистента */
+  const handleRetry = useCallback(() => {
+    const lastAssistantIdx = messages.findLastIndex(m => m.role === 'assistant' && !m.isStreaming)
+    if (lastAssistantIdx < 0) return
+    const lastUserIdx = messages.findLastIndex((m, i) => i < lastAssistantIdx && m.role === 'user')
+    if (lastUserIdx < 0) return
+    const userMessage = messages[lastUserIdx].content
+    setMessages(prev => prev.slice(0, lastAssistantIdx))
+    // Откладываем отправку до применения обновления сообщений
+    setTimeout(() => handleStreamingSend(userMessage), 0)
+  }, [messages])
+
   const handleSend = async (e) => {
     e.preventDefault()
     
@@ -495,9 +508,7 @@ function Chat({ selectedModel, settings }) {
             aria-label="Начать новый чат"
             title="Начать новый чат"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M8 3.33333V1.33333M8 14.6667V12.6667M14.6667 8H12.6667M3.33333 8H1.33333M12.6187 3.38133L11.528 4.472M4.472 11.528L3.38133 12.6187M12.6187 12.6187L11.528 11.528M4.472 4.472L3.38133 3.38133M11.3333 8C11.3333 9.84095 9.84095 11.3333 8 11.3333C6.15905 11.3333 4.66667 9.84095 4.66667 8C4.66667 6.15905 6.15905 4.66667 8 4.66667C9.84095 4.66667 11.3333 6.15905 11.3333 8Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <Plus size={16} strokeWidth={1.75} />
             <span>Новый чат</span>
           </button>
         </div>
@@ -505,13 +516,55 @@ function Chat({ selectedModel, settings }) {
       <div className="messages">
         {messages.length === 0 && (
           <div className="welcome-message">
-            <h2>Начните диалог</h2>
-            <p>Выберите модель и отправьте сообщение</p>
+            <img src="/images/sb.png" alt="" className="welcome-logo" aria-hidden="true" />
+            <h2>Помощник по бюрократии</h2>
+            <p>Выберите модель и напишите запрос — помогу с деловыми письмами, служебными записками и официальной перепиской</p>
+            <div className="suggestion-chips">
+              <button
+                type="button"
+                className="suggestion-chip"
+                onClick={() => {
+                  setInput('Составь деловое письмо по следующему поводу: ')
+                  textareaRef.current?.focus()
+                }}
+              >
+                Составить деловое письмо
+              </button>
+              <button
+                type="button"
+                className="suggestion-chip"
+                onClick={() => {
+                  setInput('Отредактируй служебную записку: ')
+                  textareaRef.current?.focus()
+                }}
+              >
+                Редактировать служебную записку
+              </button>
+              <button
+                type="button"
+                className="suggestion-chip"
+                onClick={() => {
+                  setInput('Напиши формальный ответ на запрос: ')
+                  textareaRef.current?.focus()
+                }}
+              >
+                Формальный ответ на запрос
+              </button>
+            </div>
           </div>
         )}
-        {messages.map((message, index) => (
-          <Message key={index} message={message} />
-        ))}
+        {messages.map((message, index) => {
+          const isLastAssistant = message.role === 'assistant' && !message.isStreaming &&
+            index === messages.findLastIndex(m => m.role === 'assistant' && !m.isStreaming)
+          return (
+            <Message
+              key={index}
+              message={message}
+              isLastAssistant={isLastAssistant}
+              onRetry={isLastAssistant ? handleRetry : undefined}
+            />
+          )
+        })}
         {isLoading && !messages.some(msg => msg.role === 'assistant' && msg.isStreaming) && (
           <div className="message assistant loading">
             <div className="message-content">
@@ -560,9 +613,7 @@ function Chat({ selectedModel, settings }) {
               aria-label="Остановить генерацию"
               title="Остановить генерацию"
             >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <rect x="6" y="6" width="8" height="8" rx="1" fill="currentColor"/>
-              </svg>
+              <Square size={16} strokeWidth={2.5} />
             </button>
           ) : (
             <button 
@@ -570,9 +621,7 @@ function Chat({ selectedModel, settings }) {
               className="send-button"
               disabled={!input.trim() || isLoading}
             >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M18 2L9 11M18 2L12 18L9 11M18 2L2 8L9 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <Send size={18} strokeWidth={2} />
             </button>
           )}
         </div>

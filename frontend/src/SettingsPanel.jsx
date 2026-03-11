@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { X } from 'lucide-react'
 
 // Предустановка для деловой переписки (новые значения по умолчанию)
 const BUSINESS_CORRESPONDENCE_SETTINGS = {
@@ -184,9 +185,7 @@ function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }) {
         <div className="settings-header">
           <h2>Настройки генерации</h2>
           <button className="settings-close-button" onClick={onClose} aria-label="Закрыть">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <X size={20} strokeWidth={2} />
           </button>
         </div>
 
