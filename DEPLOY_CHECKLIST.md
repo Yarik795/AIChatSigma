@@ -111,5 +111,5 @@ git push origin main
 ## Готово! 🚀
 
 После успешного деплоя ваше приложение будет доступно по адресу:
-`https://your-project.amvera.app`
+`https://ai-chat-sigma-y31415.amvera.io/`
 

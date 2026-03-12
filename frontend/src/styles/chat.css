@@ -86,12 +86,37 @@
 }
 
 .welcome-logo {
-  width: 128px;
-  height: 128px;
+  width: 160px;
+  height: 160px;
   object-fit: contain;
-  border-radius: 20px;
+  border-radius: 24px;
   margin-bottom: 0.5rem;
   animation: fadeIn 0.5s ease-out;
+}
+
+/* Адаптивные размеры welcome-логотипа */
+@media (max-width: 1024px) {
+  .welcome-logo {
+    width: 140px;
+    height: 140px;
+    border-radius: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .welcome-logo {
+    width: 120px;
+    height: 120px;
+    border-radius: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .welcome-logo {
+    width: 100px;
+    height: 100px;
+    border-radius: 16px;
+  }
 }
 
 .welcome-message h2 {

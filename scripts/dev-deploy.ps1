@@ -94,9 +94,9 @@ Write-Host ""
 Write-Host "[5/5] Push to origin/main?" -ForegroundColor Cyan
 $pushChoice = Read-Host "  [y/N]"
 if ($pushChoice -eq 'y' -or $pushChoice -eq 'Y') {
-    git push origin main 2>$null
+    $null = git push origin main 2>&1
     if ($LASTEXITCODE -ne 0) {
-        git push origin master 2>$null
+        $null = git push origin master 2>&1
     }
     if ($LASTEXITCODE -eq 0) {
         Write-Host ""
