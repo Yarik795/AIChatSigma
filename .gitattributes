@@ -1,0 +1,17 @@
+# Нормализация окончаний строк для кросс-платформенной разработки
+# Все текстовые файлы хранятся в репозитории с LF (Unix)
+# Git автоматически конвертирует при checkout в зависимости от ОС
+
+* text=auto eol=lf
+
+# Явно указать бинарные файлы (не трогать)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary

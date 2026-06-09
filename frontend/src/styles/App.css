@@ -1,0 +1,13 @@
+/**
+ * Главный файл стилей — импорт модулей
+ * Порядок важен: variables → base → animations → компоненты → responsive
+ */
+
+@import './variables.css';
+@import './base.css';
+@import './animations.css';
+@import './header.css';
+@import './chat.css';
+@import './input.css';
+@import './settings.css';
+@import './responsive.css';

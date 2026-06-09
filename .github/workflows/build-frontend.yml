@@ -1,0 +1,52 @@
+name: Build Frontend
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/build-frontend.yml'
+  workflow_dispatch:
+
+# Пропускаем запуск, если коммит сделан GitHub Actions (избегаем бесконечного цикла)
+concurrency:
+  group: build-frontend
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+          
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+          
+      # Автоматический коммит отключен - используйте ручную сборку
+      # или включите коммит только при необходимости через workflow_dispatch
+      - name: Build complete
+        run: |
+          echo "Frontend build completed. Files are in app/static/"
+          echo "To commit manually, run: git add app/static/ && git commit -m 'chore: rebuild frontend' && git push"
+

@@ -1,0 +1,47 @@
+/**
+ * Переменные темы и цветовая палитра
+ * Тёмная тема — по умолчанию, светлая — через [data-theme="light"]
+ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* Фоны (Zinc-950, 900, 800) */
+  --bg-primary: #09090b;
+  --bg-secondary: #18181b;
+  --bg-tertiary: #27272a;
+  /* Текст */
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #71717a;
+  /* Границы и поверхности */
+  --border-color: rgba(255, 255, 255, 0.08);
+  --surface-glass: rgba(255, 255, 255, 0.03);
+  /* Акцент (Indigo) */
+  --accent-color: #6366f1;
+  --accent-hover: #818cf8;
+  --accent-glow: rgba(99, 102, 241, 0.15);
+  --accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
+  /* Семантика */
+  --error-color: #ef4444;
+}
+
+[data-theme="light"] {
+  --bg-primary: #fafafa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f4f4f5;
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-tertiary: #71717a;
+  --border-color: rgba(0, 0, 0, 0.06);
+  --surface-glass: rgba(0, 0, 0, 0.02);
+  --accent-color: #4f46e5;
+  --accent-hover: #6366f1;
+  --accent-glow: rgba(79, 70, 229, 0.12);
+  --accent-gradient: linear-gradient(135deg, #4f46e5, #7c3aed);
+  --error-color: #ef4444;
+}
