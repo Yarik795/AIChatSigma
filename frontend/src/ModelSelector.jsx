@@ -3,9 +3,9 @@ import { ChevronDown } from 'lucide-react'
 
 const MODELS = [
   { 
-    value: 'google/gemini-pro-latest', 
-    label: 'Gemini Pro Latest', 
-    icon: '✨',
+    value: '~google/gemini-pro-latest',
+    label: 'Gemini Pro',
+    icon: '💎',
     logo: '/images/models/GoogleGemini.svg'
   },
   { 
